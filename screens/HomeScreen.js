@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, SafeAreaView, FlatList, Image } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, FlatList, Image, RefreshControl } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Heart, ChatCircle, Star, Share } from 'phosphor-react-native';
+import { Heart, ChatCircle, Share } from 'phosphor-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import SubHeader from '../components/SubHeader';
 import BottomMenu from '../components/BottomMenu';
+import { hapticPatterns } from '../utils/haptics';
+import { a11yProps, a11yHelpers } from '../utils/accessibility';
+import tokens from '../utils/designTokens';
 
 const HomeScreen = ({ navigation }) => {
   const { user, userProfile, signOut, supabase } = useAuth();
@@ -185,8 +188,14 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
-  const handleLike = async (listId) => {
+  const handleLike = useCallback(async (listId) => {
     if (!user) return;
+
+    const currentList = feedLists.find(l => l.id === listId);
+    const wasLiked = currentList?.is_liked;
+    
+    // Haptic feedback
+    hapticPatterns.likeButton(!wasLiked);
 
     // Optimistic update
     setFeedLists(prev => 
@@ -202,8 +211,7 @@ const HomeScreen = ({ navigation }) => {
     );
 
     try {
-      const list = feedLists.find(l => l.id === listId);
-      if (list?.is_liked) {
+      if (wasLiked) {
         await supabase.likes.unlikeList(user.id, listId);
       } else {
         await supabase.likes.likeList(user.id, listId);
@@ -216,24 +224,27 @@ const HomeScreen = ({ navigation }) => {
           list.id === listId 
             ? { 
                 ...list, 
-                is_liked: !list.is_liked,
-                likes_count: list.is_liked ? list.likes_count - 1 : list.likes_count + 1
+                is_liked: wasLiked,
+                likes_count: wasLiked ? list.likes_count + 1 : list.likes_count - 1
               }
             : list
         )
       );
+      Alert.alert('Error', 'Failed to update like. Please try again.');
     }
-  };
+  }, [user, feedLists, supabase]);
 
-  const handleComment = (listId) => {
+  const handleComment = useCallback((listId) => {
+    hapticPatterns.buttonPress('secondary');
     console.log('Comment on list:', listId);
     // TODO: Navigate to comments screen
-  };
+  }, []);
 
-  const handleShare = (listId) => {
+  const handleShare = useCallback((listId) => {
+    hapticPatterns.buttonPress('secondary');
     console.log('Share list:', listId);
-    // TODO: Implement share functionality
-  };
+    // TODO: Implement platform-specific sharing
+  }, []);
 
   const formatTimeAgo = (dateString) => {
     const now = new Date();
@@ -246,81 +257,156 @@ const HomeScreen = ({ navigation }) => {
     return `${Math.floor(diffInSeconds / 86400)}d`;
   };
 
-  const renderListPost = ({ item }) => (
-    <View style={styles.listPost}>
-      {/* Post Header */}
-      <View style={styles.postHeader}>
-        <TouchableOpacity style={styles.creatorInfo}>
-          <Image source={{ uri: item.creator.avatar_url }} style={styles.creatorAvatar} />
-          <View style={styles.creatorTexts}>
-            <Text style={styles.creatorName}>{item.creator.full_name}</Text>
-            <Text style={styles.creatorUsername}>@{item.creator.username} • {formatTimeAgo(item.created_at)}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+  const renderListPost = useCallback(({ item, index }) => {
+    const contentDescription = a11yHelpers.generateContentDescription(
+      'post',
+      `${item.title} by ${item.creator.full_name}`,
+      {
+        likes: item.likes_count,
+        comments: item.comments_count,
+        time: formatTimeAgo(item.created_at)
+      }
+    );
 
-      {/* List Content */}
-      <TouchableOpacity
-        style={styles.listContent}
-        onPress={() => navigation.navigate('ListDetail', { listId: item.id })}
-        activeOpacity={0.9}
+    return (
+      <View 
+        style={styles.listPost}
+        {...a11yProps.listItem(
+          contentDescription,
+          'Tap to view full list',
+          index,
+          feedLists.length
+        )}
       >
-        <Text style={styles.listTitle}>{item.title}</Text>
-        <Text style={styles.listDescription} numberOfLines={3}>
-          {item.description}
-        </Text>
-
-        {/* List Items Horizontal Scroll */}
-        <FlatList
-          data={item.items}
-          keyExtractor={(listItem) => listItem.id}
-          renderItem={({ item: listItem }) => (
-            <View style={styles.listItemPreview}>
-              <Image source={{ uri: listItem.image_url }} style={styles.listItemImage} />
-              <Text style={styles.listItemTitle} numberOfLines={2}>{listItem.title}</Text>
+        {/* Post Header */}
+        <View style={styles.postHeader}>
+          <TouchableOpacity 
+            style={styles.creatorInfo}
+            onPress={() => navigation.navigate('Profile', { userId: item.creator.id })}
+            {...a11yProps.button(
+              `Profile of ${item.creator.full_name}`,
+              'View profile and other lists'
+            )}
+          >
+            <Image 
+              source={{ uri: item.creator.avatar_url }} 
+              style={styles.creatorAvatar}
+              {...a11yProps.image(`${item.creator.full_name}'s profile picture`)}
+            />
+            <View style={styles.creatorTexts}>
+              <Text style={styles.creatorName}>{item.creator.full_name}</Text>
+              <Text style={styles.creatorUsername}>
+                @{item.creator.username} • {formatTimeAgo(item.created_at)}
+              </Text>
             </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* List Content */}
+        <TouchableOpacity
+          style={styles.listContent}
+          onPress={() => {
+            hapticPatterns.listItemSelection();
+            navigation.navigate('ListDetail', { listId: item.id });
+          }}
+          activeOpacity={0.9}
+          {...a11yProps.button(
+            `Open list: ${item.title}`,
+            'View full list details and items'
           )}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listItemsContainer}
-          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-        />
-      </TouchableOpacity>
-
-      {/* Post Actions */}
-      <View style={styles.postActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleLike(item.id)}
         >
-          <Heart
-            size={20}
-            color={item.is_liked ? '#ef4444' : '#666'}
-            weight={item.is_liked ? 'fill' : 'regular'}
-          />
-          <Text style={[styles.actionText, item.is_liked && styles.likedText]}>
-            {item.likes_count}
+          <Text style={styles.listTitle}>{item.title}</Text>
+          <Text style={styles.listDescription} numberOfLines={3}>
+            {item.description}
           </Text>
+
+          {/* List Items Horizontal Scroll */}
+          <FlatList
+            data={item.items}
+            keyExtractor={(listItem) => `${item.id}-${listItem.id}`}
+            renderItem={({ item: listItem, index: itemIndex }) => (
+              <View 
+                style={styles.listItemPreview}
+                {...a11yProps.image(
+                  `${listItem.title}, item ${itemIndex + 1} of ${item.items.length}`,
+                  false
+                )}
+              >
+                <Image 
+                  source={{ uri: listItem.image_url }} 
+                  style={styles.listItemImage}
+                  accessibilityIgnoresInvertColors={true}
+                />
+                <Text style={styles.listItemTitle} numberOfLines={2}>
+                  {listItem.title}
+                </Text>
+              </View>
+            )}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.listItemsContainer}
+            ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+            accessible={false}
+            removeClippedSubviews={true}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={8}
+          />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleComment(item.id)}
-        >
-          <ChatCircle size={20} color="#666" />
-          <Text style={styles.actionText}>{item.comments_count}</Text>
-        </TouchableOpacity>
+        {/* Post Actions */}
+        <View style={styles.postActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleLike(item.id)}
+            {...a11yProps.button(
+              `${item.is_liked ? 'Unlike' : 'Like'} this list`,
+              `Currently ${item.likes_count} likes`
+            )}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Heart
+              size={20}
+              color={item.is_liked ? tokens.colors.semantic.error : tokens.colors.gray[500]}
+              weight={item.is_liked ? 'fill' : 'regular'}
+            />
+            <Text style={[
+              styles.actionText, 
+              item.is_liked && styles.likedText
+            ]}>
+              {item.likes_count}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleShare(item.id)}
-        >
-          <Share size={20} color="#666" />
-          <Text style={styles.actionText}>{item.shares_count}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleComment(item.id)}
+            {...a11yProps.button(
+              'View comments',
+              `${item.comments_count} comments`
+            )}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <ChatCircle size={20} color={tokens.colors.gray[500]} />
+            <Text style={styles.actionText}>{item.comments_count}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleShare(item.id)}
+            {...a11yProps.button(
+              'Share this list',
+              'Share with others'
+            )}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Share size={20} color={tokens.colors.gray[500]} />
+            <Text style={styles.actionText}>{item.shares_count}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  }, [feedLists.length, navigation, handleLike, handleComment, handleShare]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -348,12 +434,26 @@ const HomeScreen = ({ navigation }) => {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.postSeparator} />}
-        refreshing={refreshing}
-        onRefresh={() => loadFeedLists(true)}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              hapticPatterns.pullToRefresh();
+              loadFeedLists(true);
+            }}
+            colors={[tokens.colors.primary]}
+            tintColor={tokens.colors.primary}
+            title="Pull to refresh"
+            titleColor={tokens.colors.gray[600]}
+          />
+        }
         ListHeaderComponent={() => (
           selectedCategory !== 'all' ? (
             <View style={styles.categoryInfo}>
-              <Text style={styles.categoryInfoText}>
+              <Text 
+                style={styles.categoryInfoText}
+                {...a11yProps.header(2, `Showing ${selectedCategory.toUpperCase()} lists`)}
+              >
                 Showing: {selectedCategory.toUpperCase()} lists
               </Text>
             </View>
@@ -361,11 +461,24 @@ const HomeScreen = ({ navigation }) => {
         )}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
+            <Text 
+              style={styles.emptyText}
+              {...a11yProps.header(2, isLoading ? 'Loading content' : 'No lists found')}
+            >
               {isLoading ? 'Loading...' : 'No lists found. Create your first list!'}
             </Text>
           </View>
         )}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={100}
+        initialNumToRender={3}
+        windowSize={10}
+        getItemLayout={(data, index) => ({
+          length: 300, // Approximate item height
+          offset: 300 * index,
+          index,
+        })}
       />
 
       {/* Bottom Menu */}
@@ -382,82 +495,83 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.background.primary,
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 120, // Bottom menu için boşluk
+    paddingBottom: tokens.layout.tabBarHeight + tokens.spacing.lg,
   },
   categoryInfo: {
-    backgroundColor: '#fff5f0',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    backgroundColor: tokens.colors.primaryLight,
+    padding: tokens.spacing.md,
+    borderRadius: tokens.borderRadius.medium,
+    marginHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: '#f97316',
+    borderLeftColor: tokens.colors.primary,
   },
   categoryInfoText: {
-    fontSize: 14,
-    color: '#f97316',
-    fontWeight: '600',
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.semibold,
   },
   postSeparator: {
-    height: 17,
-    backgroundColor: '#f8f9fa',
+    height: tokens.spacing.md + 1,
+    backgroundColor: tokens.colors.background.secondary,
   },
   listPost: {
-    backgroundColor: '#fff',
-    paddingVertical: 23,
+    backgroundColor: tokens.colors.background.primary,
+    paddingVertical: tokens.spacing.lg,
   },
   postHeader: {
-    paddingHorizontal: 23,
-    marginBottom: 17,
+    paddingHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.md + 1,
   },
   creatorInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: tokens.touchTarget.minimum,
   },
   creatorAvatar: {
     width: 58,
     height: 58,
     borderRadius: 29,
-    marginRight: 17,
+    marginRight: tokens.spacing.md + 1,
   },
   creatorTexts: {
     flex: 1,
   },
   creatorName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: tokens.typography.fontSize.lg,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.gray[900],
     marginBottom: 2,
   },
   creatorUsername: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[500],
   },
   listContent: {
-    paddingHorizontal: 23,
-    marginBottom: 17,
+    paddingHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.md + 1,
   },
   listTitle: {
-    fontSize: 21,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 10,
-    lineHeight: 27,
+    fontSize: tokens.typography.fontSize.xl,
+    fontWeight: tokens.typography.fontWeight.bold,
+    color: tokens.colors.gray[900],
+    marginBottom: tokens.spacing.sm + 2,
+    lineHeight: tokens.typography.fontSize.xl * tokens.typography.lineHeight.tight,
   },
   listDescription: {
-    fontSize: 18,
-    color: '#333',
-    lineHeight: 23,
-    marginBottom: 18,
+    fontSize: tokens.typography.fontSize.lg,
+    color: tokens.colors.gray[700],
+    lineHeight: tokens.typography.fontSize.lg * tokens.typography.lineHeight.normal,
+    marginBottom: tokens.spacing.lg - 5,
   },
   listItemsContainer: {
-    paddingRight: 23,
+    paddingRight: tokens.spacing.lg,
   },
   listItemPreview: {
     width: 115,
@@ -466,52 +580,56 @@ const styles = StyleSheet.create({
   listItemImage: {
     width: 115,
     height: 144,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: '#f0f0f0',
+    borderRadius: tokens.borderRadius.medium,
+    marginBottom: tokens.spacing.sm,
+    backgroundColor: tokens.colors.gray[100],
   },
   listItemTitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[600],
     textAlign: 'center',
-    lineHeight: 20,
-    fontWeight: '500',
+    lineHeight: tokens.typography.fontSize.md * tokens.typography.lineHeight.tight,
+    fontWeight: tokens.typography.fontWeight.medium,
   },
   postActions: {
     flexDirection: 'row',
-    paddingHorizontal: 23,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingTop: tokens.spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: tokens.colors.gray[200],
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    minHeight: 52,
+    marginRight: tokens.spacing.xs + 1,
+    paddingVertical: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.sm + 2,
+    borderRadius: tokens.borderRadius.medium,
+    minHeight: tokens.touchTarget.large,
+    minWidth: tokens.touchTarget.comfortable,
+    justifyContent: 'center',
   },
   actionText: {
-    fontSize: 20,
-    color: '#666',
-    marginLeft: 8,
-    fontWeight: '500',
+    fontSize: tokens.typography.fontSize.lg + 2,
+    color: tokens.colors.gray[600],
+    marginLeft: tokens.spacing.sm,
+    fontWeight: tokens.typography.fontWeight.medium,
   },
   likedText: {
-    color: '#ef4444',
+    color: tokens.colors.semantic.error,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 100,
+    paddingVertical: tokens.spacing.xxl * 2.5,
+    paddingHorizontal: tokens.spacing.xl,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[600],
     textAlign: 'center',
+    lineHeight: tokens.typography.fontSize.md * tokens.typography.lineHeight.relaxed,
   },
 });
 

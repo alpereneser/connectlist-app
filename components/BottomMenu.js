@@ -4,8 +4,9 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   House, 
   MagnifyingGlass, 
@@ -14,6 +15,9 @@ import {
   User 
 } from 'phosphor-react-native';
 import CategoryPopup from './CategoryPopup';
+import { hapticPatterns } from '../utils/haptics';
+import { a11yProps } from '../utils/accessibility';
+import tokens from '../utils/designTokens';
 
 const BottomMenu = ({ 
   activeTab = 'home',
@@ -22,6 +26,7 @@ const BottomMenu = ({
   onCategorySelect 
 }) => {
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const insets = useSafeAreaInsets();
   const tabs = [
     {
       id: 'home',
@@ -53,13 +58,16 @@ const BottomMenu = ({
 
   const handleTabPress = (tabId) => {
     if (tabId === 'create') {
+      hapticPatterns.buttonPress('primary');
       setShowCategoryPopup(true);
     } else {
+      hapticPatterns.tabSelection();
       onTabPress?.(tabId);
     }
   };
 
   const handleCategorySelect = (category) => {
+    hapticPatterns.listItemSelection();
     onCategorySelect?.(category);
     setShowCategoryPopup(false);
   };
@@ -69,9 +77,12 @@ const BottomMenu = ({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[
+      styles.safeArea,
+      { paddingBottom: insets.bottom }
+    ]}>
       <View style={styles.container}>
-        {tabs.map((tab) => {
+        {tabs.map((tab, index) => {
           const Icon = tab.icon;
           const isSelected = activeTab === tab.id;
           const isSpecial = tab.isSpecial && showCreateButton;
@@ -85,6 +96,13 @@ const BottomMenu = ({
               ]}
               onPress={() => handleTabPress(tab.id)}
               activeOpacity={0.7}
+              {...a11yProps.tab(
+                tab.label, 
+                isSelected, 
+                index, 
+                tabs.length
+              )}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <View style={[
                 styles.iconContainer,
@@ -95,14 +113,22 @@ const BottomMenu = ({
                   size={isSpecial ? 28 : 24} 
                   color={
                     isSpecial 
-                      ? '#fff' 
+                      ? tokens.colors.background.primary 
                       : isSelected 
-                        ? '#f97316' 
-                        : '#6b7280'
+                        ? tokens.colors.primary 
+                        : tokens.colors.gray[500]
                   } 
                   weight={isSelected && !isSpecial ? 'fill' : 'regular'}
                 />
               </View>
+              {!isSpecial && (
+                <Text style={[
+                  styles.tabLabel,
+                  isSelected && styles.selectedTabLabel
+                ]}>
+                  {tab.label}
+                </Text>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -113,60 +139,78 @@ const BottomMenu = ({
         onClose={handleClosePopup}
         onCategorySelect={handleCategorySelect}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    backgroundColor: tokens.colors.background.primary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: tokens.colors.gray[200],
+    ...tokens.shadows.medium,
     elevation: 20,
     zIndex: 20,
-    position: 'relative',
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingVertical: 18,
-    paddingHorizontal: 8,
-    backgroundColor: '#fff',
-    minHeight: 70,
+    paddingVertical: tokens.spacing.sm,
+    paddingHorizontal: tokens.spacing.xs,
+    backgroundColor: tokens.colors.background.primary,
+    minHeight: Platform.OS === 'ios' ? 70 : 64,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    paddingVertical: tokens.spacing.xs,
+    minHeight: tokens.touchTarget.minimum,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: tokens.borderRadius.medium,
   },
   specialTabItem: {
-    // Create button özel stilleri
+    // Create button specific styles - elevated above other tabs
   },
   specialIconContainer: {
-    backgroundColor: '#f97316',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    shadowColor: '#f97316',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: tokens.colors.primary,
+    width: tokens.touchTarget.large,
+    height: tokens.touchTarget.large,
+    borderRadius: tokens.touchTarget.large / 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: tokens.colors.primary,
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   selectedIconContainer: {
-    backgroundColor: '#fff5f0',
+    backgroundColor: tokens.colors.primaryLight,
+  },
+  tabLabel: {
+    fontSize: tokens.typography.fontSize.xs,
+    fontWeight: tokens.typography.fontWeight.medium,
+    color: tokens.colors.gray[500],
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  selectedTabLabel: {
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.semibold,
   },
 });
 
