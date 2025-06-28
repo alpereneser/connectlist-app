@@ -2,26 +2,41 @@ import { API_CONFIG } from './apiConfig';
 
 const { YANDEX } = API_CONFIG;
 
-const makeRequest = async (baseUrl, endpoint, params = {}, apiKey) => {
+const makeRequest = async (baseUrl, params = {}, apiKey) => {
   try {
-    const url = new URL(`${baseUrl}${endpoint}`);
+    const url = new URL(baseUrl);
+    
+    // Add API key first
     url.searchParams.append('apikey', apiKey);
     
+    // Add other parameters
     Object.keys(params).forEach(key => {
-      if (params[key]) {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
         url.searchParams.append(key, params[key]);
       }
     });
 
-    const response = await fetch(url.toString());
+    console.log('Making request to:', url.toString());
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'ConnectList/1.0'
+      }
+    });
     
     if (!response.ok) {
-      throw new Error(`Yandex API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Yandex API Response Error:', response.status, errorText);
+      throw new Error(`Yandex API error: ${response.status} - ${errorText}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log('Yandex API Response:', data);
+    return data;
   } catch (error) {
-    console.error('Yandex API Error:', error);
+    console.error('Yandex API Request Error:', error);
     throw error;
   }
 };
@@ -70,19 +85,19 @@ export const yandexService = {
     console.log('Yandex searchPlaces called with:', { query, latitude, longitude });
     
     try {
-      // First try with exact search
-      console.log('Making Yandex API request...');
+      // First try with exact search using corrected API format
+      console.log('Making Yandex Geocoder API request...');
       let data = await makeRequest(
         YANDEX.GEOCODER_BASE_URL,
-        '',
         {
           geocode: query,
           format: 'json',
           results: 20,
           ll: `${longitude},${latitude}`,
-          spn: '0.5,0.5', // Increased search area
+          spn: '0.5,0.5',
           rspn: 1,
           lang: 'en_US',
+          kind: 'house' // Search for buildings/places
         },
         YANDEX.GEOCODER_API_KEY
       );
@@ -91,29 +106,29 @@ export const yandexService = {
       let places = data.response?.GeoObjectCollection?.featureMember || [];
       console.log('Places found:', places.length);
       
-      // If not enough results, try with category-based search
+      // If not enough results, try different search strategies
       if (places.length < 5) {
-        const businessQueries = [
-          `${query} shop`,
-          `${query} store`,
-          `${query} business`,
-          `${query} restaurant`,
-          `${query} cafe`,
+        const searchStrategies = [
+          { query: `${query} restaurant`, kind: 'house' },
+          { query: `${query} cafe`, kind: 'house' },
+          { query: `${query} shop`, kind: 'house' },
+          { query: `${query} hotel`, kind: 'house' },
+          { query: query, kind: 'locality' }, // Try locality search
         ];
         
-        for (const businessQuery of businessQueries) {
+        for (const strategy of searchStrategies) {
           try {
             const businessData = await makeRequest(
               YANDEX.GEOCODER_BASE_URL,
-              '',
               {
-                geocode: businessQuery,
+                geocode: strategy.query,
                 format: 'json',
                 results: 10,
                 ll: `${longitude},${latitude}`,
                 spn: '0.5,0.5',
                 rspn: 1,
                 lang: 'en_US',
+                kind: strategy.kind
               },
               YANDEX.GEOCODER_API_KEY
             );
@@ -123,7 +138,7 @@ export const yandexService = {
             
             if (places.length >= 15) break;
           } catch (businessError) {
-            console.log('Business search failed for:', businessQuery);
+            console.log('Business search failed for:', strategy.query);
           }
         }
       }
@@ -195,12 +210,11 @@ export const yandexService = {
     try {
       const data = await makeRequest(
         YANDEX.GEOCODER_BASE_URL,
-        '',
         {
           geocode: `${longitude},${latitude}`,
           format: 'json',
           results: 1,
-          lang: 'en_US', // Force English language
+          lang: 'en_US'
         },
         YANDEX.GEOCODER_API_KEY
       );
@@ -241,14 +255,14 @@ export const yandexService = {
     console.log('Getting popular places near:', { latitude, longitude });
     
     const popularPlaceTypes = [
-      'restaurant',
-      'cafe',
-      'park',
-      'museum',
-      'shopping mall',
-      'tourist attraction',
-      'cinema',
-      'landmark'
+      { name: 'restaurant', kind: 'house' },
+      { name: 'cafe', kind: 'house' },
+      { name: 'park', kind: 'vegetation' },
+      { name: 'museum', kind: 'house' },
+      { name: 'shopping mall', kind: 'house' },
+      { name: 'hotel', kind: 'house' },
+      { name: 'cinema', kind: 'house' },
+      { name: 'hospital', kind: 'house' }
     ];
 
     const allPlaces = [];
@@ -257,15 +271,15 @@ export const yandexService = {
       try {
         const data = await makeRequest(
           YANDEX.GEOCODER_BASE_URL,
-          '',
           {
-            geocode: placeType,
+            geocode: placeType.name,
             format: 'json',
-            results: 5,
+            results: 3,
             ll: `${longitude},${latitude}`,
             spn: '0.3,0.3',
             rspn: 1,
             lang: 'en_US',
+            kind: placeType.kind
           },
           YANDEX.GEOCODER_API_KEY
         );
@@ -279,12 +293,12 @@ export const yandexService = {
           const placeLat = parseFloat(coords[1]);
           
           allPlaces.push({
-            id: `yandex_${placeType}_${allPlaces.length}_${Date.now()}`,
-            name: place.name || placeType.charAt(0).toUpperCase() + placeType.slice(1),
-            title: place.name || placeType.charAt(0).toUpperCase() + placeType.slice(1),
-            description: place.metaDataProperty?.GeocoderMetaData?.Address?.formatted || `Popular ${placeType} in the area`,
+            id: `yandex_${placeType.name}_${allPlaces.length}_${Date.now()}`,
+            name: place.name || placeType.name.charAt(0).toUpperCase() + placeType.name.slice(1),
+            title: place.name || placeType.name.charAt(0).toUpperCase() + placeType.name.slice(1),
+            description: place.metaDataProperty?.GeocoderMetaData?.Address?.formatted || `Popular ${placeType.name} in the area`,
             properties: {
-              name: place.name || placeType,
+              name: place.name || placeType.name,
             },
             geometry: {
               coordinates: [placeLon, placeLat]
@@ -292,20 +306,21 @@ export const yandexService = {
           });
         });
       } catch (error) {
-        console.log(`Error fetching ${placeType}:`, error);
+        console.log(`Error fetching ${placeType.name}:`, error);
       }
     }
     
     // If no real places found, return mock data
     if (allPlaces.length === 0) {
+      console.log('No places found from Yandex API, returning mock data');
       return {
         features: popularPlaceTypes.map((type, index) => ({
           id: `mock_place_${index}`,
-          name: `Popular ${type}`,
-          title: `Popular ${type}`,
-          description: `A nice ${type} to visit`,
+          name: `Popular ${type.name}`,
+          title: `Popular ${type.name}`,
+          description: `A nice ${type.name} to visit`,
           properties: {
-            name: `Popular ${type}`,
+            name: `Popular ${type.name}`,
           },
           geometry: {
             coordinates: [longitude + (Math.random() - 0.5) * 0.1, latitude + (Math.random() - 0.5) * 0.1]

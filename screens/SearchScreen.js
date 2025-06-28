@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tmdbService } from '../services/tmdbService';
 import { googleBooksService } from '../services/googleBooksService';
 import { rawgService } from '../services/rawgService';
-import { yandexService } from '../services/yandexService';
+import { placesService } from '../services/placesService';
 import { supabase } from '../lib/supabase';
 import BottomMenu from '../components/BottomMenu';
 import { SearchErrorBoundary } from '../components/ErrorBoundary';
@@ -154,7 +154,7 @@ const SearchScreen = ({ navigation }) => {
       const randomGamePage = Math.floor(Math.random() * 3) + 1;
       
       // Load popular places
-      const placesData = await yandexService.getPopularPlaces();
+      const placesData = await placesService.getPopularPlaces();
       const shuffledPlaces = placesData.features?.sort(() => Math.random() - 0.5) || [];
       setDiscoverPlaces(shuffledPlaces.slice(0, 9));
       
@@ -218,7 +218,7 @@ const SearchScreen = ({ navigation }) => {
         // Books
         googleBooksService.searchBooks(trimmedQuery),
         // Places
-        yandexService.searchPlaces(trimmedQuery),
+        placesService.searchPlaces(trimmedQuery),
         // Users
         supabase
           .from('profiles')
@@ -283,7 +283,7 @@ const SearchScreen = ({ navigation }) => {
   const loadMorePlaces = async () => {
     setLoadingMore(prev => ({ ...prev, places: true }));
     try {
-      const placesData = await yandexService.getPopularPlaces();
+      const placesData = await placesService.getPopularPlaces();
       const shuffledPlaces = placesData.features?.sort(() => Math.random() - 0.5) || [];
       const newPlaces = shuffledPlaces.slice(0, 6).map(place => ({
         ...place,
