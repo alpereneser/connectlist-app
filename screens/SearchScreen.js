@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,23 +13,35 @@ import {
   RefreshControl,
   SafeAreaView,
 } from 'react-native';
-import { MagnifyingGlass, Film, Book, GameController, MapPin, User, List, X } from 'phosphor-react-native';
+import { MagnifyingGlass, Film, Book, GameController, MapPin, User, List, X, Clock } from 'phosphor-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tmdbService } from '../services/tmdbService';
 import { googleBooksService } from '../services/googleBooksService';
 import { rawgService } from '../services/rawgService';
 import { yandexService } from '../services/yandexService';
 import { supabase } from '../lib/supabase';
 import BottomMenu from '../components/BottomMenu';
+import { SearchErrorBoundary } from '../components/ErrorBoundary';
+import { SkeletonGrid, SkeletonSearchResults } from '../components/SkeletonLoader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import tokens from '../utils/designTokens';
+import { a11yProps } from '../utils/accessibility';
+import { hapticPatterns } from '../utils/haptics';
 
 const { width } = Dimensions.get('window');
 const itemSize = (width - 16) / 3;
 
 const SearchScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
+  const searchInputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   // Discover data
   const [discoverMovies, setDiscoverMovies] = useState([]);
@@ -59,10 +71,79 @@ const SearchScreen = ({ navigation }) => {
     lists: []
   });
 
-  // Load discover content
+  // Load discover content and recent searches
   useEffect(() => {
     loadDiscoverContent();
+    loadRecentSearches();
   }, []);
+
+  // Load recent searches from AsyncStorage
+  const loadRecentSearches = async () => {
+    try {
+      const recent = await AsyncStorage.getItem('recentSearches');
+      if (recent) {
+        setRecentSearches(JSON.parse(recent));
+      }
+    } catch (error) {
+      console.error('Error loading recent searches:', error);
+    }
+  };
+
+  // Save search to recent searches
+  const saveRecentSearch = async (query) => {
+    try {
+      const recent = await AsyncStorage.getItem('recentSearches');
+      let searches = recent ? JSON.parse(recent) : [];
+      
+      // Remove if already exists
+      searches = searches.filter(s => s.toLowerCase() !== query.toLowerCase());
+      
+      // Add to beginning
+      searches.unshift(query);
+      
+      // Keep only last 10
+      searches = searches.slice(0, 10);
+      
+      await AsyncStorage.setItem('recentSearches', JSON.stringify(searches));
+      setRecentSearches(searches);
+    } catch (error) {
+      console.error('Error saving recent search:', error);
+    }
+  };
+
+  // Generate search suggestions based on input
+  const generateSuggestions = (query) => {
+    if (!query.trim()) {
+      setSearchSuggestions([]);
+      return;
+    }
+
+    const commonQueries = [
+      'action movies', 'comedy movies', 'horror movies', 'sci-fi movies',
+      'bestseller books', 'fiction books', 'mystery books', 'romance books',
+      'indie games', 'adventure games', 'strategy games', 'puzzle games',
+      'restaurants', 'cafes', 'parks', 'museums', 'hotels'
+    ];
+
+    const filtered = commonQueries
+      .filter(suggestion => 
+        suggestion.toLowerCase().includes(query.toLowerCase())
+      )
+      .slice(0, 5);
+
+    setSearchSuggestions(filtered);
+  };
+
+  // Handle search input change
+  const handleSearchInputChange = (text) => {
+    setSearchQuery(text);
+    setShowSuggestions(text.length > 0);
+    
+    // Generate suggestions after a short delay
+    setTimeout(() => {
+      generateSuggestions(text);
+    }, 300);
+  };
 
   const loadDiscoverContent = async () => {
     setLoading(true);
@@ -106,31 +187,43 @@ const SearchScreen = ({ navigation }) => {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  const handleSearch = async (query = searchQuery) => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) return;
     
+    // Haptic feedback
+    hapticPatterns.buttonPress('primary');
+    
+    // Save to recent searches
+    await saveRecentSearch(trimmedQuery);
+    
+    setSearchQuery(trimmedQuery);
     setIsSearching(true);
     setLoading(true);
+    setShowSuggestions(false);
+    
+    // Blur search input
+    searchInputRef.current?.blur();
     
     try {
       const [movies, shows, people, games, books, places, { data: users }, { data: lists }] = await Promise.all([
         // Movies
-        tmdbService.searchMovies(searchQuery),
+        tmdbService.searchMovies(trimmedQuery),
         // TV Shows
-        tmdbService.searchTVShows(searchQuery),
+        tmdbService.searchTVShows(trimmedQuery),
         // People
-        tmdbService.searchPeople(searchQuery),
+        tmdbService.searchPeople(trimmedQuery),
         // Games
-        rawgService.searchGames(searchQuery),
+        rawgService.searchGames(trimmedQuery),
         // Books
-        googleBooksService.searchBooks(searchQuery),
+        googleBooksService.searchBooks(trimmedQuery),
         // Places
-        yandexService.searchPlaces(searchQuery),
+        yandexService.searchPlaces(trimmedQuery),
         // Users
         supabase
           .from('profiles')
           .select('*')
-          .or(`username.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`)
+          .or(`username.ilike.%${trimmedQuery}%,full_name.ilike.%${trimmedQuery}%`)
           .limit(10),
         // Lists
         supabase
@@ -139,7 +232,7 @@ const SearchScreen = ({ navigation }) => {
             *,
             profiles:user_id (username, avatar_url)
           `)
-          .ilike('title', `%${searchQuery}%`)
+          .ilike('title', `%${trimmedQuery}%`)
           .limit(10)
       ]);
       
@@ -168,9 +261,22 @@ const SearchScreen = ({ navigation }) => {
   };
 
   const clearSearch = () => {
+    hapticPatterns.buttonPress('secondary');
     setSearchQuery('');
     setIsSearching(false);
     setActiveTab('users');
+    setShowSuggestions(false);
+    searchInputRef.current?.focus();
+  };
+
+  const clearRecentSearches = async () => {
+    try {
+      await AsyncStorage.removeItem('recentSearches');
+      setRecentSearches([]);
+      hapticPatterns.buttonPress('secondary');
+    } catch (error) {
+      console.error('Error clearing recent searches:', error);
+    }
   };
 
   // Load more functions for each category
@@ -555,81 +661,211 @@ const SearchScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.searchContainer}>
-          <MagnifyingGlass size={20} color="#666" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search movies, books, games, places..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch}>
-              <X size={20} color="#666" />
-            </TouchableOpacity>
+    <SearchErrorBoundary onRetry={() => setLoading(false)}>
+      <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <View style={styles.searchContainer}>
+            <MagnifyingGlass 
+              size={20} 
+              color={tokens.colors.gray[500]} 
+              {...a11yProps.image('Search icon', false)}
+            />
+            <TextInput
+              ref={searchInputRef}
+              style={styles.searchInput}
+              placeholder="Search movies, books, games, places..."
+              placeholderTextColor={tokens.colors.gray[400]}
+              value={searchQuery}
+              onChangeText={handleSearchInputChange}
+              onSubmitEditing={() => handleSearch()}
+              onFocus={() => setShowSuggestions(searchQuery.length > 0)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+              {...a11yProps.textInput('Search for content', 'Enter keywords to search')}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity 
+                onPress={clearSearch}
+                {...a11yProps.button('Clear search', 'Remove search text')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <X size={20} color={tokens.colors.gray[500]} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Search Suggestions and Recent Searches */}
+          {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && (
+            <View style={styles.suggestionsContainer}>
+              {/* Search Suggestions */}
+              {searchSuggestions.length > 0 && (
+                <View style={styles.suggestionsSection}>
+                  <Text style={styles.suggestionsSectionTitle}>Suggestions</Text>
+                  {searchSuggestions.map((suggestion, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setSearchQuery(suggestion);
+                        handleSearch(suggestion);
+                      }}
+                      {...a11yProps.button(`Search for ${suggestion}`, 'Select suggestion')}
+                    >
+                      <MagnifyingGlass size={16} color={tokens.colors.gray[400]} />
+                      <Text style={styles.suggestionText}>{suggestion}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Recent Searches */}
+              {recentSearches.length > 0 && (
+                <View style={styles.suggestionsSection}>
+                  <View style={styles.recentSearchesHeader}>
+                    <Text style={styles.suggestionsSectionTitle}>Recent Searches</Text>
+                    <TouchableOpacity
+                      onPress={clearRecentSearches}
+                      {...a11yProps.button('Clear recent searches', 'Remove all recent searches')}
+                    >
+                      <Text style={styles.clearRecentText}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {recentSearches.slice(0, 5).map((search, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setSearchQuery(search);
+                        handleSearch(search);
+                      }}
+                      {...a11yProps.button(`Search for ${search}`, 'Select recent search')}
+                    >
+                      <Clock size={16} color={tokens.colors.gray[400]} />
+                      <Text style={styles.suggestionText}>{search}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           )}
         </View>
-      </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f97316" />
-        </View>
-      ) : isSearching ? (
-        renderSearchResults()
-      ) : (
-        renderDiscoverContent()
-      )}
-      
-      <BottomMenu 
-        activeTab="search"
-        onTabPress={(tabId) => {
-          if (tabId !== 'search') {
-            navigation.navigate(tabId.charAt(0).toUpperCase() + tabId.slice(1));
-          }
-        }}
-        onCategorySelect={(category) => {
-          navigation.navigate('CreateList', { category });
-        }}
-      />
-    </SafeAreaView>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            {isSearching ? (
+              <SkeletonSearchResults />
+            ) : (
+              <SkeletonGrid columns={3} rows={4} />
+            )}
+          </View>
+        ) : isSearching ? (
+          renderSearchResults()
+        ) : (
+          renderDiscoverContent()
+        )}
+        
+        <BottomMenu 
+          activeTab="search"
+          onTabPress={(tabId) => {
+            if (tabId !== 'search') {
+              navigation.navigate(tabId.charAt(0).toUpperCase() + tabId.slice(1));
+            }
+          }}
+          onCategorySelect={(category) => {
+            navigation.navigate('CreateList', { category });
+          }}
+        />
+      </SafeAreaView>
+    </SearchErrorBoundary>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.background.primary,
   },
   header: {
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.lg,
+    backgroundColor: tokens.colors.background.primary,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: tokens.colors.gray[200],
+    zIndex: 10,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 40,
+    backgroundColor: tokens.colors.gray[100],
+    borderRadius: tokens.borderRadius.medium,
+    paddingHorizontal: tokens.spacing.md,
+    height: tokens.touchTarget.minimum,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: tokens.spacing.sm,
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[900],
+    lineHeight: tokens.typography.fontSize.md * tokens.typography.lineHeight.normal,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: tokens.colors.background.primary,
+    borderRadius: tokens.borderRadius.medium,
+    marginTop: tokens.spacing.xs,
+    shadowColor: tokens.colors.gray[900],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    maxHeight: 300,
+    zIndex: 1000,
+  },
+  suggestionsSection: {
+    paddingVertical: tokens.spacing.sm,
+  },
+  suggestionsSectionTitle: {
+    fontSize: tokens.typography.fontSize.sm,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.gray[700],
+    paddingHorizontal: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.xs,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    minHeight: tokens.touchTarget.minimum,
+  },
+  suggestionText: {
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[800],
+    marginLeft: tokens.spacing.md,
+    flex: 1,
+  },
+  recentSearchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.xs,
+  },
+  clearRecentText: {
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.medium,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: tokens.colors.background.primary,
   },
   section: {
     marginBottom: 24,

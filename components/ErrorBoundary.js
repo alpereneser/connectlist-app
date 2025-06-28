@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { WarningCircle, ArrowCounterClockwise } from 'phosphor-react-native';
+import { WarningCircle, ArrowCounterClockwise, MagnifyingGlass } from 'phosphor-react-native';
 import tokens from '../utils/designTokens';
 import { a11yProps } from '../utils/accessibility';
 import { hapticPatterns } from '../utils/haptics';

@@ -8,6 +8,7 @@ import SubHeader from '../components/SubHeader';
 import BottomMenu from '../components/BottomMenu';
 import { hapticPatterns } from '../utils/haptics';
 import { a11yProps, a11yHelpers } from '../utils/accessibility';
+import { shareList } from '../utils/platformSharing';
 import tokens from '../utils/designTokens';
 
 const HomeScreen = ({ navigation }) => {
@@ -240,11 +241,25 @@ const HomeScreen = ({ navigation }) => {
     // TODO: Navigate to comments screen
   }, []);
 
-  const handleShare = useCallback((listId) => {
-    hapticPatterns.buttonPress('secondary');
-    console.log('Share list:', listId);
-    // TODO: Implement platform-specific sharing
-  }, []);
+  const handleShare = useCallback(async (listId) => {
+    const listToShare = feedLists.find(l => l.id === listId);
+    if (!listToShare) return;
+
+    try {
+      const result = await shareList({
+        id: listToShare.id,
+        title: listToShare.title,
+        description: listToShare.description,
+        shareUrl: `https://connectlist.app/lists/${listToShare.id}`
+      });
+
+      if (result.success) {
+        console.log('List shared successfully');
+      }
+    } catch (error) {
+      console.error('Error sharing list:', error);
+    }
+  }, [feedLists]);
 
   const formatTimeAgo = (dateString) => {
     const now = new Date();
