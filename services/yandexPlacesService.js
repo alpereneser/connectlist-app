@@ -15,10 +15,15 @@ class YandexPlacesService {
     try {
       const url = new URL(this.baseUrl);
       
-      // Add API key
+      // Add API key first (required parameter)
       url.searchParams.append('apikey', this.apiKey);
       
-      // Add other parameters
+      // Add text and lang parameters (required)
+      if (!params.text) {
+        throw new Error('text parameter is required for Yandex Places API');
+      }
+      
+      // Add other parameters in correct order
       Object.keys(params).forEach(key => {
         if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
           url.searchParams.append(key, params[key]);
@@ -32,16 +37,24 @@ class YandexPlacesService {
         headers: {
           'Accept': 'application/json',
           'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': 'ConnectList/1.0'
         }
       });
       
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Yandex Places API Error:', response.status, errorText);
+        
+        // Check for specific error types
+        if (response.status === 403) {
+          throw new Error('API key invalid or rate limit exceeded');
+        }
+        
         throw new Error(`Yandex Places API error: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Yandex Places API Response:', data);
       return data;
     } catch (error) {
       console.error('Yandex Places API Request Error:', error);
@@ -54,10 +67,10 @@ class YandexPlacesService {
     try {
       const params = {
         text: text,
+        lang: options.lang || 'en_US',
         ll: `${location.lon},${location.lat}`,
         spn: options.spn || '0.5,0.5',
-        lang: options.lang || 'en_US',
-        type: options.type || 'biz',
+        type: options.type || 'biz', // 'biz' for businesses, 'geo' for geographical objects
         results: options.results || 20,
         rspn: 1 // Restrict search to specified area
       };
@@ -67,7 +80,7 @@ class YandexPlacesService {
       return {
         features: data.features || [],
         type: data.type,
-        properties: data.properties
+        properties: data.properties || {}
       };
     } catch (error) {
       console.error('Error searching places:', error);
@@ -108,7 +121,7 @@ class YandexPlacesService {
       return {
         features: data.features || [],
         type: data.type,
-        properties: data.properties
+        properties: data.properties || {}
       };
     } catch (error) {
       console.error('Error getting nearby places:', error);

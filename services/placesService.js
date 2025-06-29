@@ -98,6 +98,11 @@ export const placesService = {
       }
     } catch (error) {
       console.error('Yandex Places API failed:', error);
+      
+      // Check if it's rate limit error
+      if (error.message && error.message.includes('rate limit')) {
+        console.log('Rate limit detected, skipping to fallback');
+      }
     }
     
     // Try Yandex Geocoder API as fallback
