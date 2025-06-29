@@ -33,6 +33,7 @@ import {
 } from 'phosphor-react-native';
 import Header from '../components/Header';
 import BottomMenu from '../components/BottomMenu';
+import AvatarUpload, { AvatarImage } from '../components/AvatarUpload';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProfileScreen = ({ route, navigation }) => {
@@ -493,7 +494,33 @@ const ProfileScreen = ({ route, navigation }) => {
         <View style={styles.profileHeader}>
           <View style={styles.profileMainSection}>
             <View style={styles.profileImageContainer}>
-              <Image source={{ uri: profile.avatar_url || 'https://via.placeholder.com/150x150' }} style={styles.profileImage} />
+              {isOwnProfile ? (
+                <AvatarUpload
+                  userId={profile.id}
+                  currentAvatarUrl={profile.avatar_url}
+                  fullName={profile.full_name}
+                  username={profile.username}
+                  size={120}
+                  onUploadSuccess={(result) => {
+                    setProfile(prev => ({
+                      ...prev,
+                      avatar_url: result.avatarUrl
+                    }));
+                    console.log('Avatar updated successfully');
+                  }}
+                  onUploadError={(error) => {
+                    console.error('Avatar upload failed:', error);
+                  }}
+                />
+              ) : (
+                <AvatarImage
+                  avatarUrl={profile.avatar_url}
+                  fullName={profile.full_name}
+                  username={profile.username}
+                  size={120}
+                  style={styles.profileImage}
+                />
+              )}
             </View>
 
             <View style={styles.profileInfo}>

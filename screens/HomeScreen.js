@@ -9,6 +9,7 @@ import BottomMenu from '../components/BottomMenu';
 import { hapticPatterns } from '../utils/haptics';
 import { a11yProps, a11yHelpers } from '../utils/accessibility';
 import { shareList } from '../utils/platformSharing';
+import { AvatarImage } from '../components/AvatarUpload';
 import tokens from '../utils/designTokens';
 
 const HomeScreen = ({ navigation }) => {
@@ -303,10 +304,12 @@ const HomeScreen = ({ navigation }) => {
               'View profile and other lists'
             )}
           >
-            <Image 
-              source={{ uri: item.creator.avatar_url }} 
+            <AvatarImage
+              avatarUrl={item.creator.avatar_url}
+              fullName={item.creator.full_name}
+              username={item.creator.username}
+              size={58}
               style={styles.creatorAvatar}
-              {...a11yProps.image(`${item.creator.full_name}'s profile picture`)}
             />
             <View style={styles.creatorTexts}>
               <Text style={styles.creatorName}>{item.creator.full_name}</Text>
