@@ -1,5 +1,6 @@
 // Multi-provider places service with fallback support
 import { yandexService } from './yandexService';
+import { yandexPlacesService } from './yandexPlacesService';
 
 // Mock places data for reliable fallback
 const generateMockPlaces = (query = 'place', count = 15) => {
@@ -80,24 +81,42 @@ export const placesService = {
   searchPlaces: async (query, latitude = 41.0082, longitude = 28.9784) => {
     console.log('PlacesService: Searching for places:', { query, latitude, longitude });
     
-    // Always try Yandex first, but with improved error handling
+    // Try Yandex Places API first
     try {
-      console.log('Trying Yandex API...');
-      const yandexResult = await yandexService.searchPlaces(query, latitude, longitude);
+      console.log('Trying Yandex Places API...');
+      const result = await yandexPlacesService.searchPlaces(query, { lat: latitude, lon: longitude });
       
-      if (yandexResult && yandexResult.features && yandexResult.features.length > 0) {
-        console.log('Yandex API returned', yandexResult.features.length, 'places');
+      if (result.features && result.features.length > 0) {
+        console.log('Yandex Places API returned', result.features.length, 'places');
+        const formattedFeatures = result.features.map(place => yandexPlacesService.formatPlaceData(place));
+        
         return {
-          ...yandexResult,
-          provider: 'yandex',
-          total_results: yandexResult.features.length
+          features: formattedFeatures,
+          total_results: formattedFeatures.length,
+          provider: 'yandex_places'
         };
       }
     } catch (error) {
-      console.error('Yandex API failed:', error);
+      console.error('Yandex Places API failed:', error);
     }
     
-    // Fallback to mock data
+    // Try Yandex Geocoder API as fallback
+    try {
+      console.log('Trying Yandex Geocoder API as fallback...');
+      const yandexResult = await yandexService.searchPlaces(query, latitude, longitude);
+      
+      if (yandexResult && yandexResult.features && yandexResult.features.length > 0) {
+        console.log('Yandex Geocoder API returned', yandexResult.features.length, 'places');
+        return {
+          ...yandexResult,
+          provider: 'yandex_geocoder'
+        };
+      }
+    } catch (error) {
+      console.error('Yandex Geocoder API also failed:', error);
+    }
+    
+    // Final fallback to mock data
     console.log('Using mock data for places search:', query);
     const mockPlaces = generateMockPlaces(query, 15);
     
@@ -113,23 +132,39 @@ export const placesService = {
   getPopularPlaces: async (latitude = 41.0082, longitude = 28.9784) => {
     console.log('PlacesService: Getting popular places near:', { latitude, longitude });
     
-    // Try Yandex first
+    // Try Yandex Places API for nearby popular places
     try {
-      console.log('Trying Yandex API for popular places...');
-      const yandexResult = await yandexService.getPopularPlaces(latitude, longitude);
+      console.log('Trying Yandex Places API for popular places...');
+      const result = await yandexPlacesService.getNearbyPlaces({ lat: latitude, lon: longitude });
       
-      if (yandexResult && yandexResult.features && yandexResult.features.length > 0) {
-        console.log('Yandex API returned', yandexResult.features.length, 'popular places');
+      if (result.features && result.features.length > 0) {
+        console.log('Yandex Places API returned', result.features.length, 'nearby places');
+        const formattedFeatures = result.features.map(place => yandexPlacesService.formatPlaceData(place));
+        
         return {
-          ...yandexResult,
-          provider: 'yandex'
+          features: formattedFeatures,
+          total_results: formattedFeatures.length,
+          provider: 'yandex_places'
         };
       }
     } catch (error) {
-      console.error('Yandex API failed for popular places:', error);
+      console.error('Yandex Places API failed for popular places:', error);
     }
     
-    // Fallback to curated mock data
+    // Try Geocoder as fallback
+    try {
+      const yandexResult = await yandexService.getPopularPlaces(latitude, longitude);
+      if (yandexResult && yandexResult.features && yandexResult.features.length > 0) {
+        return {
+          ...yandexResult,
+          provider: 'yandex_geocoder'
+        };
+      }
+    } catch (error) {
+      console.error('Yandex Geocoder API also failed:', error);
+    }
+    
+    // Fallback to mock data
     console.log('Using mock data for popular places');
     const mockPlaces = generateMockPlaces('Popular', 20);
     
@@ -173,30 +208,17 @@ export const placesService = {
   getPlaceDetails: async (placeId, latitude, longitude) => {
     console.log('PlacesService: Getting place details:', { placeId, latitude, longitude });
     
-    // If it's a mock place, return mock details
-    if (placeId.includes('mock_')) {
-      return {
-        id: placeId,
-        title: 'Mock Place Details',
-        description: 'This is a mock place for testing purposes',
-        address: 'Mock Address, Mock City, Turkey',
-        coordinates: { latitude, longitude },
-        image_url: `https://static-maps.yandex.ru/1.x/?ll=${longitude},${latitude}&size=300,200&z=15&l=map&pt=${longitude},${latitude},pm2rdm&lang=en_US`,
-        provider: 'mock'
-      };
-    }
-    
-    // Try Yandex for real places
-    try {
-      const result = await yandexService.getPlaceDetails(latitude, longitude);
-      return {
-        ...result,
-        provider: 'yandex'
-      };
-    } catch (error) {
-      console.error('Error getting place details:', error);
-      throw error;
-    }
+    // Always return mock details for now (Yandex API disabled)
+    return {
+      id: placeId,
+      title: 'Mock Place Details',
+      description: 'This is a mock place for testing purposes',
+      address: 'Mock Address, Mock City, Turkey',
+      coordinates: { latitude, longitude },
+      image_url: `https://static-maps.yandex.ru/1.x/?ll=${longitude},${latitude}&size=300,200&z=15&l=map&pt=${longitude},${latitude},pm2rdm&lang=en_US`,
+      provider: 'mock',
+      reason: 'yandex_rate_limited'
+    };
   },
 
   // Get categorized popular places for discover screen

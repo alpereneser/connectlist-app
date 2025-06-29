@@ -19,9 +19,9 @@ export const API_CONFIG = {
     BASE_URL: 'https://www.googleapis.com/youtube/v3',
   },
   YANDEX: {
-    PLACES_API_KEY: '5aa5fbc3-04fe-42e3-b60a-1bbcc424b887',
-    GEOCODER_API_KEY: 'f48f98ab-7906-4d87-9796-cca6191eb9d5',
-    PLACES_BASE_URL: 'https://api.yandex.com/places/v1',
+    PLACES_API_KEY: '5aa5fbc3-04fe-42e3-b60a-1bbcc424b887', // Yandex Place HTTP API
+    GEOCODER_API_KEY: 'f48f98ab-7906-4d87-9796-cca6191eb9d5', // JavaScript API and Geocoder HTTP API
+    PLACES_BASE_URL: 'https://api-places.biz.mail.ru/v1', // Yandex Places API endpoint
     GEOCODER_BASE_URL: 'https://geocode-maps.yandex.ru/1.x',
   },
 };
