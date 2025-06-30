@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, auth } from '../lib/supabase';
 import { supabaseService } from '../services/supabaseService';
+import { handleAuthError, handleError } from '../services/errorService';
 
 const AuthContext = createContext();
 
@@ -28,7 +29,10 @@ export const AuthProvider = ({ children }) => {
           await fetchUserProfile(session.user.id);
         }
       } catch (error) {
-        console.error('Error getting initial session:', error);
+        await handleAuthError(error, { 
+          context: 'initial_session',
+          action: 'getSession' 
+        });
       } finally {
         setIsLoading(false);
         setIsInitialized(true);
@@ -70,7 +74,11 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user profile:', error);
+        await handleAuthError(error, {
+          context: 'fetch_profile',
+          userId,
+          action: 'fetchUserProfile'
+        });
         return;
       }
 
@@ -78,7 +86,11 @@ export const AuthProvider = ({ children }) => {
         setUserProfile(data);
       }
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
+      await handleAuthError(error, {
+        context: 'fetch_profile_catch',
+        userId,
+        action: 'fetchUserProfile'
+      });
     }
   };
 
@@ -99,14 +111,22 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('Error creating user profile:', error);
+        await handleAuthError(error, {
+          context: 'create_profile',
+          userId,
+          action: 'createUserProfile'
+        });
         return { data: null, error };
       }
 
       setUserProfile(data);
       return { data, error: null };
     } catch (error) {
-      console.error('Error in createUserProfile:', error);
+      await handleAuthError(error, {
+        context: 'create_profile_catch',
+        userId,
+        action: 'createUserProfile'
+      });
       return { data: null, error };
     }
   };
@@ -140,7 +160,11 @@ export const AuthProvider = ({ children }) => {
 
       return { data, error: null };
     } catch (error) {
-      console.error('Sign up error:', error);
+      await handleAuthError(error, {
+        context: 'signup',
+        email,
+        action: 'signUp'
+      });
       return { data: null, error };
     } finally {
       setIsLoading(false);
@@ -160,9 +184,28 @@ export const AuthProvider = ({ children }) => {
         return { data: null, error };
       }
 
+      // Check if email is verified
+      if (data.user && !data.user.email_confirmed_at) {
+        // Sign out the user immediately if email is not verified
+        await supabase.auth.signOut();
+        return { 
+          data: null, 
+          error: { 
+            message: 'Email not verified. Please check your email and verify your account before signing in.',
+            code: 'EMAIL_NOT_VERIFIED',
+            needsVerification: true,
+            email: email
+          } 
+        };
+      }
+
       return { data, error: null };
     } catch (error) {
-      console.error('Sign in error:', error);
+      await handleAuthError(error, {
+        context: 'signin',
+        email,
+        action: 'signIn'
+      });
       return { data: null, error };
     } finally {
       setIsLoading(false);
@@ -182,7 +225,10 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(null);
       return { error: null };
     } catch (error) {
-      console.error('Sign out error:', error);
+      await handleAuthError(error, {
+        context: 'signout',
+        action: 'signOut'
+      });
       return { error };
     } finally {
       setIsLoading(false);
@@ -201,7 +247,11 @@ export const AuthProvider = ({ children }) => {
 
       return { data, error: null };
     } catch (error) {
-      console.error('Reset password error:', error);
+      await handleAuthError(error, {
+        context: 'reset_password',
+        email,
+        action: 'resetPassword'
+      });
       return { data: null, error };
     }
   };

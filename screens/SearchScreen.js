@@ -12,8 +12,10 @@ import {
   Dimensions,
   RefreshControl,
   SafeAreaView,
+  Animated,
+  StatusBar,
 } from 'react-native';
-import { MagnifyingGlass, Film, Book, GameController, MapPin, User, List, X, Clock } from 'phosphor-react-native';
+import { MagnifyingGlass, Film, Book, GameController, MapPin, User, List, X, Clock, Camera, Sparkle, TrendingUp } from 'phosphor-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tmdbService } from '../services/tmdbService';
 import { googleBooksService } from '../services/googleBooksService';
@@ -28,12 +30,21 @@ import tokens from '../utils/designTokens';
 import { a11yProps } from '../utils/accessibility';
 import { hapticPatterns } from '../utils/haptics';
 
-const { width } = Dimensions.get('window');
-const itemSize = (width - 16) / 3;
-
 const SearchScreen = ({ navigation }) => {
+  const [screenData, setScreenData] = useState(Dimensions.get('window'));
+
+  // Responsive grid calculation with proper spacing
+  const getItemSize = () => {
+    const screenPadding = tokens.spacing.screenPadding * 2; // Both sides
+    const itemSpacing = tokens.spacing.sm * 2; // Between items
+    const availableWidth = screenData.width - screenPadding - itemSpacing;
+    return Math.floor(availableWidth / 3);
+  };
+
+  const itemSize = getItemSize();
   const insets = useSafeAreaInsets();
   const searchInputRef = useRef(null);
+  const searchBarAnimation = useRef(new Animated.Value(0)).current;
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,6 +53,10 @@ const SearchScreen = ({ navigation }) => {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [recentSearches, setRecentSearches] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [trendingSearches, setTrendingSearches] = useState([
+    '🎬 Action Movies', '📚 Bestsellers', '🎮 Indie Games', 
+    '☕ Coffee Shops', '🎭 Art Museums', '🏞️ Nature Parks'
+  ]);
   
   // Discover data
   const [discoverMovies, setDiscoverMovies] = useState([]);
@@ -70,6 +85,15 @@ const SearchScreen = ({ navigation }) => {
     users: [],
     lists: []
   });
+
+  // Handle screen dimension changes for responsive design
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenData(window);
+    });
+
+    return () => subscription?.remove();
+  }, []);
 
   // Load discover content and recent searches
   useEffect(() => {
@@ -139,10 +163,49 @@ const SearchScreen = ({ navigation }) => {
     setSearchQuery(text);
     setShowSuggestions(text.length > 0);
     
+    // Animate search bar on focus
+    if (text.length > 0 && !isSearching) {
+      Animated.timing(searchBarAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    } else if (text.length === 0) {
+      Animated.timing(searchBarAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+    
     // Generate suggestions after a short delay
     setTimeout(() => {
       generateSuggestions(text);
     }, 300);
+  };
+
+  // Handle search input focus
+  const handleSearchFocus = () => {
+    setShowSuggestions(searchQuery.length > 0);
+    Animated.timing(searchBarAnimation, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // Handle search input blur
+  const handleSearchBlur = () => {
+    setTimeout(() => {
+      setShowSuggestions(false);
+      if (!searchQuery.length) {
+        Animated.timing(searchBarAnimation, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      }
+    }, 200);
   };
 
   const loadDiscoverContent = async () => {
@@ -526,13 +589,73 @@ const SearchScreen = ({ navigation }) => {
     );
   };
 
+  // Render trending section (Instagram-style)
+  const renderTrendingSection = () => (
+    <View style={styles.trendingSection}>
+      <View style={styles.trendingSectionHeader}>
+        <TrendingUp size={20} color={tokens.colors.primary} weight="bold" />
+        <Text style={styles.trendingSectionTitle}>Trending Searches</Text>
+      </View>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.trendingContainer}
+      >
+        {trendingSearches.map((trend, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.trendingItem}
+            onPress={() => {
+              const cleanTrend = trend.replace(/[^\w\s]/gi, '').trim();
+              setSearchQuery(cleanTrend);
+              handleSearch(cleanTrend);
+            }}
+          >
+            <Text style={styles.trendingText}>{trend}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  // Render quick actions (Instagram-style camera, etc.)
+  const renderQuickActions = () => (
+    <View style={styles.quickActionsSection}>
+      <TouchableOpacity 
+        style={styles.quickActionItem}
+        onPress={() => navigation.navigate('CreateList')}
+      >
+        <View style={styles.quickActionIcon}>
+          <Camera size={24} color={tokens.colors.background.primary} weight="bold" />
+        </View>
+        <Text style={styles.quickActionText}>Create List</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.quickActionItem}
+        onPress={() => navigation.navigate('Discover')}
+      >
+        <View style={[styles.quickActionIcon, { backgroundColor: tokens.colors.accent.purple }]}>
+          <Sparkle size={24} color={tokens.colors.background.primary} weight="fill" />
+        </View>
+        <Text style={styles.quickActionText}>Discover</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderDiscoverContent = () => (
     <ScrollView 
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={loadDiscoverContent} />
       }
+      contentContainerStyle={styles.discoverScrollContent}
     >
+      {/* Trending Section */}
+      {renderTrendingSection()}
+      
+      {/* Quick Actions */}
+      {renderQuickActions()}
       {/* Places Section - 1st */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -663,23 +786,45 @@ const SearchScreen = ({ navigation }) => {
   return (
     <SearchErrorBoundary onRetry={() => setLoading(false)}>
       <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar 
+          barStyle="dark-content" 
+          backgroundColor={tokens.colors.background.primary} 
+        />
+        
         <View style={styles.header}>
-          <View style={styles.searchContainer}>
+          {/* Enhanced Search Bar with Animation */}
+          <Animated.View style={[
+            styles.searchContainer,
+            {
+              borderWidth: searchBarAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 2],
+              }),
+              borderColor: searchBarAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [tokens.colors.gray[200], tokens.colors.primary],
+              }),
+              shadowOpacity: searchBarAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.1],
+              }),
+            }
+          ]}>
             <MagnifyingGlass 
               size={20} 
-              color={tokens.colors.gray[500]} 
+              color={searchQuery.length > 0 ? tokens.colors.primary : tokens.colors.gray[500]} 
               {...a11yProps.image('Search icon', false)}
             />
             <TextInput
               ref={searchInputRef}
               style={styles.searchInput}
-              placeholder="Search movies, books, games, places..."
+              placeholder="Search everything on ConnectList..."
               placeholderTextColor={tokens.colors.gray[400]}
               value={searchQuery}
               onChangeText={handleSearchInputChange}
               onSubmitEditing={() => handleSearch()}
-              onFocus={() => setShowSuggestions(searchQuery.length > 0)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
               returnKeyType="search"
               autoCapitalize="none"
               autoCorrect={false}
@@ -690,11 +835,12 @@ const SearchScreen = ({ navigation }) => {
                 onPress={clearSearch}
                 {...a11yProps.button('Clear search', 'Remove search text')}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.clearButton}
               >
                 <X size={20} color={tokens.colors.gray[500]} />
               </TouchableOpacity>
             )}
-          </View>
+          </Animated.View>
 
           {/* Search Suggestions and Recent Searches */}
           {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && (
@@ -792,18 +938,27 @@ const styles = StyleSheet.create({
     paddingBottom: tokens.spacing.lg,
     backgroundColor: tokens.colors.background.primary,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: tokens.colors.gray[200],
+    borderBottomColor: tokens.colors.gray[100],
     zIndex: 10,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.gray[100],
-    borderRadius: tokens.borderRadius.medium,
-    paddingHorizontal: tokens.spacing.md,
-    height: tokens.touchTarget.minimum,
+    backgroundColor: tokens.colors.gray[50],
+    borderRadius: tokens.borderRadius.large,
+    paddingHorizontal: tokens.spacing.lg,
+    height: 48,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: tokens.colors.gray[200],
+    shadowColor: tokens.colors.gray[900],
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  clearButton: {
+    padding: tokens.spacing.xs,
+    borderRadius: tokens.borderRadius.full,
+    backgroundColor: tokens.colors.gray[200],
   },
   searchInput: {
     flex: 1,
@@ -868,101 +1023,182 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.background.primary,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: tokens.spacing.xl,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.md,
+    minHeight: tokens.touchTarget.minimum,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: tokens.typography.fontSize.lg,
+    fontWeight: tokens.typography.fontWeight.bold,
+    color: tokens.colors.gray[900],
   },
   loadMoreButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    minHeight: tokens.touchTarget.minimum,
+    justifyContent: 'center',
   },
   loadMoreText: {
-    color: '#f97316',
-    fontSize: 14,
-    fontWeight: '500',
+    color: tokens.colors.primary,
+    fontSize: tokens.typography.fontSize.sm,
+    fontWeight: tokens.typography.fontWeight.medium,
   },
   discoverItem: {
     width: itemSize,
-    marginHorizontal: 4,
-    marginBottom: 8,
+    marginHorizontal: tokens.spacing.xs,
+    marginBottom: tokens.spacing.sm,
   },
   discoverImage: {
-    width: itemSize - 8,
+    width: itemSize - tokens.spacing.sm,
     height: itemSize * 1.5,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    borderRadius: tokens.borderRadius.medium,
+    backgroundColor: tokens.colors.gray[100],
   },
   discoverTitle: {
-    fontSize: 12,
-    marginTop: 4,
-    color: '#333',
-    lineHeight: 16,
-    minHeight: 32,
+    fontSize: tokens.typography.fontSize.xs,
+    marginTop: tokens.spacing.xs,
+    color: tokens.colors.gray[900],
+    lineHeight: tokens.typography.fontSize.xs * tokens.typography.lineHeight.tight,
+    minHeight: tokens.typography.fontSize.xs * tokens.typography.lineHeight.tight * 2,
   },
   discoverSubtitle: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginTop: 2,
+    fontSize: tokens.typography.fontSize.xs - 1,
+    color: tokens.colors.gray[500],
+    marginTop: tokens.spacing.xs / 2,
   },
   searchResultsContainer: {
     flex: 1,
   },
   tabsWrapper: {
-    height: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fed7aa',
+    height: tokens.touchTarget.large,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: tokens.colors.primaryLight,
   },
   tabsContainer: {
-    height: 50,
+    height: tokens.touchTarget.large,
     flex: 1,
   },
   tabsContentContainer: {
     alignItems: 'center',
-    height: 50,
+    height: tokens.touchTarget.large,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    marginRight: 6,
-    height: 50,
+    paddingHorizontal: tokens.spacing.md,
+    marginRight: tokens.spacing.sm,
+    height: tokens.touchTarget.large,
     justifyContent: 'center',
+    minWidth: tokens.touchTarget.comfortable,
   },
   activeTab: {
     borderBottomWidth: 3,
-    borderBottomColor: '#f97316',
-    height: 50,
+    borderBottomColor: tokens.colors.primary,
+    height: tokens.touchTarget.large,
   },
   tabText: {
-    marginLeft: 4,
-    color: '#6b7280',
-    fontSize: 14,
+    marginLeft: tokens.spacing.xs,
+    color: tokens.colors.gray[500],
+    fontSize: tokens.typography.fontSize.sm,
   },
   activeTabText: {
-    color: '#f97316',
-    fontWeight: '600',
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.semibold,
   },
   gridContainer: {
-    padding: 8,
+    padding: tokens.spacing.sm,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingVertical: tokens.spacing.xxl * 2,
+    paddingHorizontal: tokens.spacing.lg,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[500],
+    textAlign: 'center',
+    lineHeight: tokens.typography.fontSize.md * tokens.typography.lineHeight.normal,
+  },
+  // New Instagram-style elements
+  discoverScrollContent: {
+    paddingBottom: tokens.spacing.xxl,
+  },
+  trendingSection: {
+    marginBottom: tokens.spacing.xl,
+    paddingHorizontal: tokens.spacing.lg,
+  },
+  trendingSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: tokens.spacing.md,
+  },
+  trendingSectionTitle: {
+    fontSize: tokens.typography.fontSize.lg,
+    fontWeight: tokens.typography.fontWeight.bold,
+    color: tokens.colors.gray[900],
+    marginLeft: tokens.spacing.sm,
+  },
+  trendingContainer: {
+    paddingRight: tokens.spacing.lg,
+  },
+  trendingItem: {
+    backgroundColor: tokens.colors.primary,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.borderRadius.full,
+    marginRight: tokens.spacing.md,
+    shadowColor: tokens.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  trendingText: {
+    color: tokens.colors.background.primary,
+    fontSize: tokens.typography.fontSize.sm,
+    fontWeight: tokens.typography.fontWeight.semibold,
+  },
+  quickActionsSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.xl,
+    backgroundColor: tokens.colors.gray[50],
+    marginHorizontal: tokens.spacing.lg,
+    borderRadius: tokens.borderRadius.large,
+    marginBottom: tokens.spacing.xl,
+  },
+  quickActionItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  quickActionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: tokens.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: tokens.spacing.sm,
+    shadowColor: tokens.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  quickActionText: {
+    fontSize: tokens.typography.fontSize.sm,
+    fontWeight: tokens.typography.fontWeight.medium,
+    color: tokens.colors.gray[700],
+    textAlign: 'center',
   },
 });
 

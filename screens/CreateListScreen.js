@@ -31,6 +31,7 @@ import { rawgService } from '../services/rawgService';
 import { googleBooksService } from '../services/googleBooksService';
 import { youtubeService } from '../services/youtubeService';
 import { yandexService } from '../services/yandexService';
+import tokens from '../utils/designTokens';
 
 const CreateListScreen = ({ route, navigation }) => {
   const { category, existingListId } = route.params || {};
@@ -459,7 +460,7 @@ const CreateListScreen = ({ route, navigation }) => {
             />
           ) : (
             <View style={styles.searchInputContainer}>
-              <MagnifyingGlass size={20} color="#666" style={styles.searchIcon} />
+              <MagnifyingGlass size={20} color={tokens.colors.gray[500]} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder={`Search ${category?.name?.toLowerCase()}...`}
@@ -492,7 +493,7 @@ const CreateListScreen = ({ route, navigation }) => {
                     style={styles.removeItemButton}
                     onPress={() => toggleItemSelection(item)}
                   >
-                    <X size={16} color="#fff" />
+                    <X size={16} color={tokens.colors.background.primary} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -519,7 +520,7 @@ const CreateListScreen = ({ route, navigation }) => {
                 </Text>
               </View>
               <View style={[styles.selectionIndicator, isSelected && styles.selectedIndicator]}>
-                {isSelected && <Check size={16} color="#fff" />}
+                {isSelected && <Check size={16} color={tokens.colors.background.primary} />}
               </View>
             </TouchableOpacity>
           );
@@ -544,7 +545,7 @@ const CreateListScreen = ({ route, navigation }) => {
             style={[styles.listOption, createNewList && styles.selectedListOption]}
             onPress={() => setCreateNewList(true)}
           >
-            <Plus size={24} color={createNewList ? '#f97316' : '#666'} />
+            <Plus size={24} color={createNewList ? tokens.colors.primary : tokens.colors.gray[500]} />
             <Text style={[styles.listOptionText, createNewList && styles.selectedListOptionText]}>
               Create New List
             </Text>
@@ -592,7 +593,7 @@ const CreateListScreen = ({ route, navigation }) => {
               <Text style={styles.existingListTitle}>{item.title}</Text>
               <Text style={styles.existingListDescription}>{item.description}</Text>
               <View style={[styles.selectionIndicator, selectedList?.id === item.id && styles.selectedIndicator]}>
-                {selectedList?.id === item.id && <Check size={16} color="#fff" />}
+                {selectedList?.id === item.id && <Check size={16} color={tokens.colors.background.primary} />}
               </View>
             </TouchableOpacity>
           )}
@@ -618,7 +619,7 @@ const CreateListScreen = ({ route, navigation }) => {
             style={[styles.privacyOption, privacy === 'public' && styles.selectedPrivacyOption]}
             onPress={() => setPrivacy('public')}
           >
-            <Globe size={24} color={privacy === 'public' ? '#f97316' : '#666'} />
+            <Globe size={24} color={privacy === 'public' ? tokens.colors.primary : tokens.colors.gray[500]} />
             <View style={styles.privacyOptionContent}>
               <Text style={[styles.privacyOptionTitle, privacy === 'public' && styles.selectedPrivacyText]}>
                 Public
@@ -628,7 +629,7 @@ const CreateListScreen = ({ route, navigation }) => {
               </Text>
             </View>
             <View style={[styles.selectionIndicator, privacy === 'public' && styles.selectedIndicator]}>
-              {privacy === 'public' && <Check size={16} color="#fff" />}
+              {privacy === 'public' && <Check size={16} color={tokens.colors.background.primary} />}
             </View>
           </TouchableOpacity>
 
@@ -636,7 +637,7 @@ const CreateListScreen = ({ route, navigation }) => {
             style={[styles.privacyOption, privacy === 'friends' && styles.selectedPrivacyOption]}
             onPress={() => setPrivacy('friends')}
           >
-            <Users size={24} color={privacy === 'friends' ? '#f97316' : '#666'} />
+            <Users size={24} color={privacy === 'friends' ? tokens.colors.primary : tokens.colors.gray[500]} />
             <View style={styles.privacyOptionContent}>
               <Text style={[styles.privacyOptionTitle, privacy === 'friends' && styles.selectedPrivacyText]}>
                 Friends Only
@@ -646,7 +647,7 @@ const CreateListScreen = ({ route, navigation }) => {
               </Text>
             </View>
             <View style={[styles.selectionIndicator, privacy === 'friends' && styles.selectedIndicator]}>
-              {privacy === 'friends' && <Check size={16} color="#fff" />}
+              {privacy === 'friends' && <Check size={16} color={tokens.colors.background.primary} />}
             </View>
           </TouchableOpacity>
 
@@ -654,7 +655,7 @@ const CreateListScreen = ({ route, navigation }) => {
             style={[styles.privacyOption, privacy === 'private' && styles.selectedPrivacyOption]}
             onPress={() => setPrivacy('private')}
           >
-            <Lock size={24} color={privacy === 'private' ? '#f97316' : '#666'} />
+            <Lock size={24} color={privacy === 'private' ? tokens.colors.primary : tokens.colors.gray[500]} />
             <View style={styles.privacyOptionContent}>
               <Text style={[styles.privacyOptionTitle, privacy === 'private' && styles.selectedPrivacyText]}>
                 Private
@@ -664,7 +665,7 @@ const CreateListScreen = ({ route, navigation }) => {
               </Text>
             </View>
             <View style={[styles.selectionIndicator, privacy === 'private' && styles.selectedIndicator]}>
-              {privacy === 'private' && <Check size={16} color="#fff" />}
+              {privacy === 'private' && <Check size={16} color={tokens.colors.background.primary} />}
             </View>
           </TouchableOpacity>
         </View>
@@ -727,7 +728,7 @@ const CreateListScreen = ({ route, navigation }) => {
 
       <View style={styles.bottomActions}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <ArrowLeft size={20} color="#666" />
+          <ArrowLeft size={20} color={tokens.colors.gray[500]} />
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         
@@ -735,7 +736,7 @@ const CreateListScreen = ({ route, navigation }) => {
           <Text style={styles.nextButtonText}>
             {currentStep === 3 ? 'Create List' : 'Next'}
           </Text>
-          {currentStep < 3 && <ArrowRight size={20} color="#fff" />}
+          {currentStep < 3 && <ArrowRight size={20} color={tokens.colors.background.primary} />}
         </TouchableOpacity>
       </View>
 

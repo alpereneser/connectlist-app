@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -27,32 +28,71 @@ import {
   Smiley,
 } from 'phosphor-react-native';
 import Header from '../components/Header';
+import { useAuth } from '../contexts/AuthContext';
+import { messageService } from '../services/messageService';
+import { supabase } from '../lib/supabase';
+import { SkeletonMessages, SkeletonMessageInput } from '../components/SkeletonLoader';
+import tokens from '../utils/designTokens';
 
 const MessageDetailScreen = ({ route, navigation }) => {
   const { conversationId, participant } = route.params;
+  const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(true);
+  const [typingUsers, setTypingUsers] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
   const flatListRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
-    loadMessages();
+    if (conversationId && user?.id) {
+      loadMessages();
+      subscribeToMessages();
+      subscribeToTyping();
+      subscribeToPresence();
+      markMessagesAsRead();
+    }
+
+    return () => {
+      messageService.unsubscribeAll();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [conversationId, user]);
+
+  const loadMessages = async (reset = true) => {
+    if (reset) {
+      setIsLoading(true);
+      setMessages([]);
+    }
     
-    // Simulate typing indicator
-    const typingTimer = setTimeout(() => {
-      setIsTyping(false);
-    }, 3000);
-
-    return () => clearTimeout(typingTimer);
-  }, [conversationId]);
-
-  const loadMessages = async () => {
-    setIsLoading(true);
     try {
-      // TODO: Fetch from Supabase messages table
+      const data = await messageService.getMessages(conversationId, 50);
+      
+      if (reset) {
+        setMessages(data);
+        setHasOlderMessages(data.length === 50); // If we got full page, assume there might be more
+      } else {
+        setMessages(prev => [...data, ...prev]);
+        setHasOlderMessages(data.length === 30); // For load more
+      }
+      
+      // Scroll to bottom after initial loading
+      if (reset) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      // Fallback to mock messages for demo
       const mockMessages = [
         {
           id: 'msg1',
@@ -111,54 +151,117 @@ const MessageDetailScreen = ({ route, navigation }) => {
       ];
 
       setMessages(mockMessages);
-    } catch (error) {
-      console.error('Load messages error:', error);
     } finally {
-      setIsLoading(false);
+      if (reset) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const loadOlderMessages = async () => {
+    if (isLoadingOlder || !hasOlderMessages || messages.length === 0) return;
+    
+    setIsLoadingOlder(true);
+    try {
+      const oldestMessage = messages[0];
+      const olderMessages = await messageService.getOlderMessages(
+        conversationId, 
+        oldestMessage.id, 
+        30
+      );
+      
+      if (olderMessages.length > 0) {
+        setMessages(prev => [...olderMessages, ...prev]);
+        setHasOlderMessages(olderMessages.length === 30);
+      } else {
+        setHasOlderMessages(false);
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
+  const subscribeToMessages = () => {
+    messageService.subscribeToMessages(conversationId, (newMessage) => {
+      setMessages(prev => [...prev, newMessage]);
+      
+      // Scroll to bottom when new message arrives
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+      // Mark as read if conversation is open
+      if (newMessage.sender_id !== user?.id) {
+        markMessagesAsRead();
+      }
+    });
+  };
+
+  const subscribeToTyping = () => {
+    messageService.subscribeToTyping(conversationId, (users) => {
+      setTypingUsers(users.filter(u => u.user_id !== user?.id));
+    });
+  };
+
+  const subscribeToPresence = () => {
+    const channel = supabase.channel(`presence:${participant.id}`)
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        setIsOnline(Object.keys(state).length > 0);
+      })
+      .subscribe();
+  };
+
+  const markMessagesAsRead = async () => {
+    try {
+      await messageService.markAsRead(conversationId, user?.id);
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || isSending) return;
 
     const messageText = newMessage.trim();
     setNewMessage('');
+    setIsSending(true);
 
     try {
-      const tempMessage = {
-        id: `temp-${Date.now()}`,
-        conversation_id: conversationId,
-        sender_id: 'current_user',
-        content: messageText,
-        message_type: 'text',
-        created_at: new Date().toISOString(),
-        is_read: false,
-      };
-
-      setMessages(prev => [...prev, tempMessage]);
-
-      // TODO: Send to Supabase
-      // For now, just simulate a response
-      setTimeout(() => {
-        setIsTyping(true);
-        setTimeout(() => {
-          const responseMessage = {
-            id: `response-${Date.now()}`,
-            conversation_id: conversationId,
-            sender_id: participant.id,
-            content: getAutoResponse(messageText),
-            message_type: 'text',
-            created_at: new Date().toISOString(),
-            is_read: true,
-          };
-          setMessages(prev => [...prev, responseMessage]);
-          setIsTyping(false);
-        }, 2000);
-      }, 500);
-
+      await messageService.sendMessage(conversationId, user?.id, messageText);
+      
+      // Stop typing indicator
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        messageService.sendTypingIndicator(conversationId, user?.id, false);
+      }
     } catch (error) {
       console.error('Send message error:', error);
       Alert.alert('Error', 'Failed to send message');
+      setNewMessage(messageText); // Restore message on error
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleTextChange = (text) => {
+    setNewMessage(text);
+    
+    // Send typing indicator
+    if (text.length > 0) {
+      messageService.sendTypingIndicator(conversationId, user?.id, true);
+      
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set new timeout to stop typing
+      typingTimeoutRef.current = setTimeout(() => {
+        messageService.sendTypingIndicator(conversationId, user?.id, false);
+      }, 3000);
     }
   };
 
@@ -185,28 +288,26 @@ const MessageDetailScreen = ({ route, navigation }) => {
   };
 
 
-  const handleCameraPress = () => {
-    Alert.alert(
-      'Camera',
-      'Choose an option',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Take Photo', onPress: () => console.log('Take photo') },
-        { text: 'Record Video', onPress: () => console.log('Record video') },
-      ]
-    );
+  const handleCameraPress = async () => {
+    try {
+      setIsSending(true);
+      await messageService.sendImageMessage(conversationId, user?.id);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send image');
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleGalleryPress = () => {
-    Alert.alert(
-      'Gallery',
-      'Choose media type',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Photo', onPress: () => console.log('Select photo from gallery') },
-        { text: 'Video', onPress: () => console.log('Select video from gallery') },
-      ]
-    );
+  const handleGalleryPress = async () => {
+    try {
+      setIsSending(true);
+      await messageService.sendImageMessage(conversationId, user?.id);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send image');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleVoicePress = () => {
@@ -238,7 +339,7 @@ const MessageDetailScreen = ({ route, navigation }) => {
   };
 
   const renderMessage = ({ item, index }) => {
-    const isCurrentUser = item.sender_id === 'current_user';
+    const isCurrentUser = item.sender_id === user?.id;
     const nextMessage = messages[index + 1];
     const isLastInGroup = !nextMessage || nextMessage.sender_id !== item.sender_id;
     
@@ -249,7 +350,12 @@ const MessageDetailScreen = ({ route, navigation }) => {
       ]}>
         {!isCurrentUser && isLastInGroup && (
           <Image 
-            source={{ uri: participant.avatar_url }} 
+            source={{ 
+              uri: item.sender?.avatar_url || participant?.avatar_url || 
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  participant?.full_name || 'User'
+                )}&background=f97316&color=fff&size=150`
+            }} 
             style={styles.messageAvatar} 
           />
         )}
@@ -257,21 +363,68 @@ const MessageDetailScreen = ({ route, navigation }) => {
         <View style={[
           styles.messageBubble,
           isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
-          !isCurrentUser && !isLastInGroup && styles.messageWithoutAvatar
+          !isCurrentUser && !isLastInGroup && styles.messageWithoutAvatar,
+          item.message_type === 'image' && styles.imageBubble
         ]}>
-          <Text style={[
-            styles.messageText,
-            isCurrentUser ? styles.currentUserText : styles.otherUserText
-          ]}>
-            {item.content}
-          </Text>
+          {item.message_type === 'image' ? (
+            <TouchableOpacity 
+              onPress={() => {
+                // TODO: Open image viewer
+                const imageData = JSON.parse(item.content);
+                console.log('Open image:', imageData.url);
+              }}
+            >
+              {(() => {
+                try {
+                  const imageData = JSON.parse(item.content);
+                  return (
+                    <Image 
+                      source={{ uri: imageData.thumbnailUrl || imageData.url }} 
+                      style={[
+                        styles.messageImage,
+                        {
+                          width: Math.min(imageData.width || 200, 200),
+                          height: Math.min(imageData.height || 200, 200),
+                        }
+                      ]}
+                      resizeMode="cover"
+                      onLoad={() => {
+                        // Load full resolution image after thumbnail
+                        if (imageData.thumbnailUrl && imageData.url !== imageData.thumbnailUrl) {
+                          // This would trigger loading of full image in a real implementation
+                        }
+                      }}
+                    />
+                  );
+                } catch (e) {
+                  // Fallback for old format
+                  return (
+                    <Image 
+                      source={{ uri: item.content }} 
+                      style={styles.messageImage}
+                      resizeMode="cover"
+                    />
+                  );
+                }
+              })()}
+            </TouchableOpacity>
+          ) : (
+            <Text style={[
+              styles.messageText,
+              isCurrentUser ? styles.currentUserText : styles.otherUserText
+            ]}>
+              {item.content}
+            </Text>
+          )}
           
           {isLastInGroup && (
             <Text style={[
               styles.messageTime,
-              isCurrentUser ? styles.currentUserTime : styles.otherUserTime
+              isCurrentUser ? styles.currentUserTime : styles.otherUserTime,
+              item.message_type === 'image' && styles.imageMessageTime
             ]}>
               {formatMessageTime(item.created_at)}
+              {item.is_edited && ' (edited)'}
             </Text>
           )}
         </View>
@@ -289,20 +442,21 @@ const MessageDetailScreen = ({ route, navigation }) => {
   };
 
   const renderTypingIndicator = () => {
-    if (!isTyping) return null;
+    if (typingUsers.length === 0) return null;
 
     return (
       <View style={[styles.messageContainer, styles.otherUserMessage]}>
         <Image 
-          source={{ uri: participant.avatar_url }} 
+          source={{ 
+            uri: participant?.avatar_url || 
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                participant?.full_name || 'User'
+              )}&background=f97316&color=fff&size=150`
+          }} 
           style={styles.messageAvatar} 
         />
         <View style={[styles.messageBubble, styles.otherUserBubble, styles.typingBubble]}>
-          <View style={styles.typingIndicator}>
-            <View style={[styles.typingDot, { animationDelay: 0 }]} />
-            <View style={[styles.typingDot, { animationDelay: 0.2 }]} />
-            <View style={[styles.typingDot, { animationDelay: 0.4 }]} />
-          </View>
+          <ActivityIndicator size="small" color="#999" />
         </View>
       </View>
     );
@@ -322,11 +476,16 @@ const MessageDetailScreen = ({ route, navigation }) => {
       {/* User Status Bar */}
       <View style={styles.userStatusBar}>
         <Image 
-          source={{ uri: participant.avatar_url }} 
+          source={{ 
+            uri: participant?.avatar_url || 
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                participant?.full_name || 'User'
+              )}&background=f97316&color=fff&size=150`
+          }} 
           style={styles.statusAvatar} 
         />
         <Text style={styles.userStatus}>
-          {participant.is_online ? 'Online' : 'Active 30m ago'}
+          {typingUsers.length > 0 ? 'Typing...' : isOnline ? 'Online' : 'Offline'}
         </Text>
         
         <View style={styles.actionButtons}>
@@ -343,20 +502,39 @@ const MessageDetailScreen = ({ route, navigation }) => {
       </View>
 
       {/* Messages */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        showsVerticalScrollIndicator={false}
-        ListFooterComponent={renderTypingIndicator}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-      />
+      {isLoading ? (
+        <SkeletonMessages />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContent}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={renderTypingIndicator}
+          ListHeaderComponent={() => (
+            isLoadingOlder ? (
+              <View style={styles.loadingOlderContainer}>
+                <ActivityIndicator size="small" color={tokens.colors.primary} />
+                <Text style={styles.loadingOlderText}>Loading older messages...</Text>
+              </View>
+            ) : null
+          )}
+          onEndReached={loadOlderMessages}
+          onEndReachedThreshold={0.1}
+          inverted={true} // This makes the list start from bottom and scroll up for older messages
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10,
+          }}
+        />
+      )}
 
       {/* Message Input */}
       <KeyboardAvoidingView 
@@ -374,10 +552,11 @@ const MessageDetailScreen = ({ route, navigation }) => {
               style={styles.textInput}
               placeholder="Message..."
               value={newMessage}
-              onChangeText={setNewMessage}
+              onChangeText={handleTextChange}
               multiline
               maxLength={1000}
               placeholderTextColor="#999"
+              editable={!isSending}
             />
             
             {newMessage.trim() === '' && (
@@ -409,16 +588,20 @@ const MessageDetailScreen = ({ route, navigation }) => {
           <TouchableOpacity 
             style={[
               styles.sendButton,
-              newMessage.trim() ? styles.sendButtonActive : styles.sendButtonInactive
+              (newMessage.trim() && !isSending) ? styles.sendButtonActive : styles.sendButtonInactive
             ]}
             onPress={sendMessage}
-            disabled={!newMessage.trim()}
+            disabled={!newMessage.trim() || isSending}
           >
-            <PaperPlaneTilt 
-              size={20} 
-              color={newMessage.trim() ? '#fff' : '#999'} 
-              weight="fill" 
-            />
+            {isSending ? (
+              <ActivityIndicator size="small" color="#999" />
+            ) : (
+              <PaperPlaneTilt 
+                size={20} 
+                color={newMessage.trim() ? '#fff' : '#999'} 
+                weight="fill" 
+              />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -677,6 +860,35 @@ const styles = StyleSheet.create({
   },
   emojiText: {
     fontSize: 24,
+  },
+  // Image message styles
+  imageBubble: {
+    padding: 4,
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+  },
+  imageMessageTime: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    color: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  loadingOlderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  loadingOlderText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
   },
 });
 

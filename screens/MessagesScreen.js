@@ -10,6 +10,7 @@ import {
   FlatList,
   RefreshControl,
   TextInput,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -23,21 +24,106 @@ import {
 } from 'phosphor-react-native';
 import Header from '../components/Header';
 import BottomMenu from '../components/BottomMenu';
+import { useAuth } from '../contexts/AuthContext';
+import { messageService } from '../services/messageService';
+import { supabase } from '../lib/supabase';
+import { SkeletonConversations } from '../components/SkeletonLoader';
 
 const MessagesScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('messages');
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (user?.id) {
+      loadConversations();
+      subscribeToUpdates();
+    }
+
+    return () => {
+      messageService.unsubscribeAll();
+    };
+  }, [user]);
 
   const loadConversations = async () => {
+    if (!user?.id) return;
+    
     setIsLoading(true);
     try {
-      // TODO: Fetch from Supabase conversations table
+      const data = await messageService.getConversations(user.id);
+      setConversations(data);
+      
+      // Subscribe to online presence for each conversation
+      data.forEach(conv => {
+        if (conv.participant?.id) {
+          subscribeToUserPresence(conv.participant.id);
+        }
+      });
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Error', 'Failed to load conversations');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const subscribeToUpdates = () => {
+    if (!user?.id) return;
+
+    // Subscribe to conversation updates
+    messageService.subscribeToConversations(user.id, (payload) => {
+      // Reload conversations when new messages arrive
+      loadConversations();
+    });
+  };
+
+  const subscribeToUserPresence = (userId) => {
+    const channel = supabase.channel(`presence:${userId}`)
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const isOnline = Object.keys(state).length > 0;
+        
+        setOnlineUsers(prev => {
+          const newSet = new Set(prev);
+          if (isOnline) {
+            newSet.add(userId);
+          } else {
+            newSet.delete(userId);
+          }
+          return newSet;
+        });
+      })
+      .subscribe();
+  };
+
+  const createNewConversation = async () => {
+    // Navigate to a user selection screen or search
+    navigation.navigate('UserSearch', {
+      onSelectUser: async (selectedUser) => {
+        try {
+          const conversationId = await messageService.createOrGetConversation(
+            user.id,
+            selectedUser.id
+          );
+          
+          navigation.navigate('MessageDetail', {
+            conversationId,
+            participant: selectedUser,
+          });
+        } catch (error) {
+          Alert.alert('Error', 'Failed to create conversation');
+        }
+      },
+    });
+  };
+
+  const loadConversationsOld = async () => {
+    setIsLoading(true);
+    try {
+      // Mock data for fallback
       const mockConversations = [
         {
           id: 'conv1',
@@ -183,8 +269,9 @@ const MessagesScreen = ({ navigation }) => {
   );
 
   const renderConversation = ({ item }) => {
-    const isCurrentUserSender = item.last_message.sender_id === 'current_user';
+    const isCurrentUserSender = item.last_message?.sender_id === user?.id;
     const hasUnread = item.unread_count > 0;
+    const isOnline = onlineUsers.has(item.participant?.id);
 
     return (
       <TouchableOpacity
@@ -194,10 +281,15 @@ const MessagesScreen = ({ navigation }) => {
       >
         <View style={styles.avatarContainer}>
           <Image 
-            source={{ uri: item.participant.avatar_url }} 
+            source={{ 
+              uri: item.participant?.avatar_url || 
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  item.participant?.full_name || 'User'
+                )}&background=f97316&color=fff&size=150`
+            }} 
             style={styles.avatar} 
           />
-          {item.participant.is_online && (
+          {isOnline && (
             <View style={styles.onlineIndicator} />
           )}
         </View>
@@ -273,7 +365,7 @@ const MessagesScreen = ({ navigation }) => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.quickActions}
         >
-          <TouchableOpacity style={styles.quickAction}>
+          <TouchableOpacity style={styles.quickAction} onPress={createNewConversation}>
             <View style={styles.quickActionIcon}>
               <Plus size={20} color="#fff" />
             </View>
@@ -282,7 +374,7 @@ const MessagesScreen = ({ navigation }) => {
           
           {/* Online friends quick access */}
           {conversations
-            .filter(conv => conv.participant.is_online)
+            .filter(conv => onlineUsers.has(conv.participant?.id))
             .slice(0, 5)
             .map((conv) => (
               <TouchableOpacity 
@@ -292,13 +384,18 @@ const MessagesScreen = ({ navigation }) => {
               >
                 <View style={styles.quickActionAvatarContainer}>
                   <Image 
-                    source={{ uri: conv.participant.avatar_url }} 
+                    source={{ 
+                      uri: conv.participant?.avatar_url || 
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          conv.participant?.full_name || 'User'
+                        )}&background=f97316&color=fff&size=150`
+                    }} 
                     style={styles.quickActionAvatar} 
                   />
                   <View style={styles.quickActionOnlineIndicator} />
                 </View>
                 <Text style={styles.quickActionText} numberOfLines={1}>
-                  {conv.participant.username}
+                  {conv.participant?.username || conv.participant?.full_name?.split(' ')[0]}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -306,30 +403,34 @@ const MessagesScreen = ({ navigation }) => {
       </View>
 
       {/* Conversations list */}
-      <FlatList
-        data={filteredConversations}
-        keyExtractor={(item) => item.id}
-        renderItem={renderConversation}
-        style={styles.conversationsList}
-        contentContainerStyle={styles.conversationsContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={loadConversations}
-            tintColor="#f97316"
-          />
-        }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <PaperPlaneTilt size={48} color="#ccc" />
-            <Text style={styles.emptyTitle}>No messages yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Start a conversation with your friends about lists
-            </Text>
-          </View>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <SkeletonConversations />
+      ) : (
+        <FlatList
+          data={filteredConversations}
+          keyExtractor={(item) => item.id}
+          renderItem={renderConversation}
+          style={styles.conversationsList}
+          contentContainerStyle={styles.conversationsContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={loadConversations}
+              tintColor="#f97316"
+            />
+          }
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <PaperPlaneTilt size={48} color="#ccc" />
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Start a conversation with your friends about lists
+              </Text>
+            </View>
+          )}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       <BottomMenu 
         activeTab={activeTab} 

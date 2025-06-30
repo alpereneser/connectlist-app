@@ -4,7 +4,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Platform-aware design tokens
 export const tokens = {
-  // Spacing system
+  // Spacing system - Mobile-optimized
   spacing: {
     xs: 4,
     sm: 8, 
@@ -12,6 +12,11 @@ export const tokens = {
     lg: 24,
     xl: 32,
     xxl: 40,
+    // Common spacing combinations for mobile
+    inputPadding: 16,
+    buttonPadding: { horizontal: 24, vertical: 12 },
+    cardPadding: 16,
+    screenPadding: 20,
   },
 
   // Border radius with platform differences
@@ -22,11 +27,11 @@ export const tokens = {
     xlarge: Platform.OS === 'ios' ? 24 : 16,
   },
 
-  // Typography scale
+  // Typography scale - Mobile-first with better readability
   typography: {
     fontSize: {
-      xs: 11,
-      sm: 13,
+      xs: 12, // Increased from 11 for better mobile readability
+      sm: 14, // Increased from 13
       md: 16,
       lg: 18,
       xl: 22,
@@ -40,9 +45,9 @@ export const tokens = {
       bold: '700',
     },
     lineHeight: {
-      tight: 1.2,
-      normal: 1.4,
-      relaxed: 1.6,
+      tight: 1.3, // Increased from 1.2 for better readability
+      normal: 1.5, // Increased from 1.4
+      relaxed: 1.7, // Increased from 1.6
     },
   },
 
@@ -116,11 +121,12 @@ export const tokens = {
     }),
   },
 
-  // Touch targets
+  // Touch targets - Improved for mobile usability
   touchTarget: {
     minimum: 44, // iOS and Android minimum
-    comfortable: 48,
+    comfortable: 48, // Recommended default
     large: 56,
+    hitSlop: 8, // Additional touch area around elements
   },
 
   // Animation durations

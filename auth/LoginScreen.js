@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../contexts/AuthContext';
+import tokens from '../utils/designTokens';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -36,7 +37,20 @@ const LoginScreen = ({ navigation }) => {
     if (error) {
       let errorMessage = 'An error occurred while signing in';
       
-      if (error.message.includes('Invalid login credentials')) {
+      if (error.code === 'EMAIL_NOT_VERIFIED' || error.needsVerification) {
+        Alert.alert(
+          'Email Verification Required',
+          'Please verify your email address before signing in. Check your inbox for the verification link.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Verify Email',
+              onPress: () => navigation.navigate('EmailVerification', { email: error.email || email })
+            }
+          ]
+        );
+        return;
+      } else if (error.message.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password';
       } else if (error.message.includes('Email not confirmed')) {
         errorMessage = 'Please verify your email address before signing in';
@@ -140,16 +154,16 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.background.primary,
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: tokens.spacing.screenPadding,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: tokens.spacing.lg,
   },
   logo: {
     width: 130,
@@ -157,87 +171,87 @@ const styles = StyleSheet.create({
   },
   welcomeContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: tokens.spacing.xxl,
   },
   welcomeTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    fontSize: tokens.typography.fontSize.xxl,
+    fontWeight: tokens.typography.fontWeight.bold,
+    color: tokens.colors.gray[900],
+    marginBottom: tokens.spacing.sm,
   },
   welcomeSubtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[600],
     textAlign: 'center',
   },
   formContainer: {
     width: '100%',
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: tokens.spacing.lg,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: tokens.typography.fontSize.sm,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.gray[800],
+    marginBottom: tokens.spacing.sm,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e1e1e1',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    borderColor: tokens.colors.gray[300],
+    borderRadius: tokens.borderRadius.medium,
+    paddingHorizontal: tokens.spacing.inputPadding,
+    paddingVertical: tokens.spacing.md,
+    fontSize: tokens.typography.fontSize.md,
+    backgroundColor: tokens.colors.gray[50],
+    minHeight: tokens.touchTarget.comfortable,
   },
   forgotContainer: {
     alignItems: 'flex-end',
-    marginBottom: 32,
+    marginBottom: tokens.spacing.xl,
   },
   forgotText: {
-    fontSize: 14,
-    color: '#f97316',
-    fontWeight: '500',
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.medium,
+    minHeight: tokens.touchTarget.minimum,
+    lineHeight: tokens.touchTarget.minimum,
   },
   loginButton: {
-    backgroundColor: '#f97316',
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: tokens.colors.primary,
+    borderRadius: tokens.borderRadius.medium,
+    paddingVertical: tokens.spacing.buttonPadding.vertical,
+    paddingHorizontal: tokens.spacing.buttonPadding.horizontal,
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#f97316',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    marginBottom: tokens.spacing.lg,
+    minHeight: tokens.touchTarget.comfortable,
+    ...tokens.shadows.medium,
   },
   loginButtonDisabled: {
-    backgroundColor: '#ccc',
-    shadowOpacity: 0,
-    elevation: 0,
+    backgroundColor: tokens.colors.gray[400],
+    ...tokens.shadows.small,
   },
   loginButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontSize: tokens.typography.fontSize.md,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.background.primary,
   },
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: tokens.touchTarget.minimum,
   },
   registerText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.gray[600],
   },
   registerLink: {
-    fontSize: 14,
-    color: '#f97316',
-    fontWeight: '600',
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    paddingHorizontal: tokens.spacing.xs,
+    paddingVertical: tokens.spacing.xs,
   },
 });
 

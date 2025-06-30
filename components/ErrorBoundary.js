@@ -1,14 +1,15 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { WarningCircle, ArrowCounterClockwise, MagnifyingGlass } from 'phosphor-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { WarningCircle, ArrowCounterClockwise, MagnifyingGlass, Bug } from 'phosphor-react-native';
 import tokens from '../utils/designTokens';
 import { a11yProps } from '../utils/accessibility';
 import { hapticPatterns } from '../utils/haptics';
+import { handleError } from '../services/errorService';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, errorId: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -16,22 +17,19 @@ class ErrorBoundary extends React.Component {
     return { hasError: true };
   }
 
-  componentDidCatch(error, errorInfo) {
-    // Log error details
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    this.setState({
-      error: error,
-      errorInfo: errorInfo
+  async componentDidCatch(error, errorInfo) {
+    // Log the error using our error service
+    const errorResult = await handleError(error, {
+      context: 'react_error_boundary',
+      componentStack: errorInfo.componentStack,
+      errorBoundary: this.props.fallbackType || 'default'
     });
 
-    // You can also log the error to an error reporting service here
-    if (__DEV__) {
-      console.log('Error details:', {
-        error: error.toString(),
-        componentStack: errorInfo.componentStack
-      });
-    }
+    this.setState({
+      error,
+      errorInfo,
+      errorId: errorResult.id
+    });
   }
 
   handleRetry = () => {
@@ -39,13 +37,33 @@ class ErrorBoundary extends React.Component {
     this.setState({ 
       hasError: false, 
       error: null, 
-      errorInfo: null 
+      errorInfo: null,
+      errorId: null
     });
     
     // Call retry callback if provided
     if (this.props.onRetry) {
       this.props.onRetry();
     }
+  };
+
+  handleReportError = () => {
+    Alert.alert(
+      'Report Error',
+      `Error ID: ${this.state.errorId}\n\nThis error has been logged. Would you like to provide additional feedback?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Send Feedback', onPress: this.sendFeedback }
+      ]
+    );
+  };
+
+  sendFeedback = () => {
+    Alert.alert(
+      'Thank You',
+      'Your feedback helps us improve the app. We\'ll look into this issue.',
+      [{ text: 'OK' }]
+    );
   };
 
   render() {
@@ -82,7 +100,18 @@ class ErrorBoundary extends React.Component {
               <View style={styles.errorDetails}>
                 <Text style={styles.errorDetailsTitle}>Error Details (Dev Mode):</Text>
                 <Text style={styles.errorDetailsText}>
+                  Error ID: {this.state.errorId}
+                </Text>
+                <Text style={styles.errorDetailsText}>
                   {this.state.error.toString()}
+                </Text>
+              </View>
+            )}
+
+            {!__DEV__ && this.state.errorId && (
+              <View style={styles.errorIdContainer}>
+                <Text style={styles.errorIdText}>
+                  Error ID: {this.state.errorId}
                 </Text>
               </View>
             )}
@@ -102,6 +131,22 @@ class ErrorBoundary extends React.Component {
                   style={styles.retryIcon}
                 />
                 <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.reportButton}
+                onPress={this.handleReportError}
+                {...a11yProps.button(
+                  'Report error',
+                  'Report this error to help us improve the app'
+                )}
+              >
+                <Bug 
+                  size={20} 
+                  color={tokens.colors.gray[600]}
+                  style={styles.reportIcon}
+                />
+                <Text style={styles.reportButtonText}>Report Error</Text>
               </TouchableOpacity>
 
               {this.props.onGoBack && (
@@ -265,6 +310,42 @@ const styles = StyleSheet.create({
     color: tokens.colors.gray[700],
   },
   
+  // Error ID styles
+  errorIdContainer: {
+    backgroundColor: tokens.colors.gray[50],
+    padding: tokens.spacing.sm,
+    borderRadius: tokens.borderRadius.small,
+    marginBottom: tokens.spacing.lg,
+  },
+  errorIdText: {
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.gray[600],
+    textAlign: 'center',
+    fontFamily: 'monospace',
+  },
+  
+  // Report button styles
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: tokens.colors.gray[300],
+    paddingHorizontal: tokens.spacing.xl,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.borderRadius.medium,
+    minHeight: tokens.touchTarget.minimum,
+  },
+  reportIcon: {
+    marginRight: tokens.spacing.sm,
+  },
+  reportButtonText: {
+    fontSize: tokens.typography.fontSize.md,
+    fontWeight: tokens.typography.fontWeight.medium,
+    color: tokens.colors.gray[600],
+  },
+  
   // Network error styles
   networkErrorContainer: {
     flex: 1,
@@ -306,5 +387,29 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.xl,
   },
 });
+
+// Hook for handling async errors in components
+export const useErrorHandler = () => {
+  const handleAsyncError = React.useCallback(async (error, context = {}) => {
+    const errorResult = await handleError(error, {
+      ...context,
+      source: 'useErrorHandler'
+    });
+    return errorResult;
+  }, []);
+
+  return { handleAsyncError };
+};
+
+// Higher-order component for wrapping components with error boundary
+export const withErrorBoundary = (Component, fallbackType = 'full') => {
+  return function WrappedComponent(props) {
+    return (
+      <ErrorBoundary fallbackType={fallbackType}>
+        <Component {...props} />
+      </ErrorBoundary>
+    );
+  };
+};
 
 export default ErrorBoundary;

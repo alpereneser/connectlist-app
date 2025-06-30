@@ -197,6 +197,69 @@ export const SkeletonGrid = ({ columns = 3, rows = 3, animated = true }) => (
   </View>
 );
 
+// Message skeletons
+export const SkeletonConversations = ({ animated = true }) => (
+  <View style={styles.conversationsSkeleton}>
+    {[1, 2, 3, 4, 5, 6].map(i => (
+      <View key={i} style={styles.conversationItemSkeleton}>
+        <SkeletonAvatar size={52} animated={animated} />
+        <View style={styles.conversationContentSkeleton}>
+          <View style={styles.conversationHeaderSkeleton}>
+            <SkeletonText width={120} height={16} animated={animated} />
+            <SkeletonText width={30} height={12} animated={animated} />
+          </View>
+          <SkeletonText width="90%" height={14} style={{ marginTop: 4 }} animated={animated} />
+        </View>
+      </View>
+    ))}
+  </View>
+);
+
+export const SkeletonMessages = ({ animated = true }) => (
+  <View style={styles.messagesSkeleton}>
+    {[1, 2, 3, 4, 5].map(i => (
+      <View key={i} style={[
+        styles.messageItemSkeleton,
+        i % 2 === 0 ? styles.myMessageSkeleton : styles.otherMessageSkeleton
+      ]}>
+        {i % 2 !== 0 && <SkeletonAvatar size={28} animated={animated} />}
+        <View style={[
+          styles.messageBubbleSkeleton,
+          i % 2 === 0 ? styles.myBubbleSkeleton : styles.otherBubbleSkeleton
+        ]}>
+          <SkeletonText 
+            width={Math.random() * 80 + 60 + '%'} 
+            height={16} 
+            animated={animated} 
+          />
+          {Math.random() > 0.7 && (
+            <SkeletonText 
+              width={Math.random() * 60 + 40 + '%'} 
+              height={16} 
+              style={{ marginTop: 4 }} 
+              animated={animated} 
+            />
+          )}
+        </View>
+      </View>
+    ))}
+  </View>
+);
+
+export const SkeletonMessageInput = ({ animated = true }) => (
+  <View style={styles.messageInputSkeleton}>
+    <SkeletonBox width={24} height={24} borderRadius={12} animated={animated} />
+    <SkeletonBox 
+      width="70%" 
+      height={36} 
+      borderRadius={18} 
+      style={{ marginHorizontal: 12 }} 
+      animated={animated} 
+    />
+    <SkeletonBox width={36} height={36} borderRadius={18} animated={animated} />
+  </View>
+);
+
 // Loading state wrapper
 export const SkeletonLoader = ({ 
   loading, 
@@ -314,6 +377,69 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: tokens.spacing.md,
+  },
+
+  // Message skeletons
+  conversationsSkeleton: {
+    paddingVertical: tokens.spacing.md,
+  },
+  conversationItemSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    marginBottom: tokens.spacing.xs,
+  },
+  conversationContentSkeleton: {
+    flex: 1,
+    marginLeft: tokens.spacing.md,
+  },
+  conversationHeaderSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: tokens.spacing.xs,
+  },
+
+  messagesSkeleton: {
+    flex: 1,
+    paddingVertical: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.lg,
+  },
+  messageItemSkeleton: {
+    flexDirection: 'row',
+    marginBottom: tokens.spacing.md,
+    alignItems: 'flex-end',
+  },
+  myMessageSkeleton: {
+    justifyContent: 'flex-end',
+  },
+  otherMessageSkeleton: {
+    justifyContent: 'flex-start',
+  },
+  messageBubbleSkeleton: {
+    maxWidth: '75%',
+    padding: tokens.spacing.md,
+    borderRadius: tokens.borderRadius.large,
+    marginHorizontal: tokens.spacing.sm,
+  },
+  myBubbleSkeleton: {
+    backgroundColor: tokens.colors.gray[100],
+    borderBottomRightRadius: tokens.borderRadius.small,
+  },
+  otherBubbleSkeleton: {
+    backgroundColor: tokens.colors.gray[200],
+    borderBottomLeftRadius: tokens.borderRadius.small,
+  },
+
+  messageInputSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: tokens.colors.gray[200],
+    backgroundColor: tokens.colors.background.primary,
   },
 });
 

@@ -8,12 +8,17 @@ import {
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { handleAuthError } from '../services/errorService';
 
 const EmailVerificationScreen = ({ navigation, route }) => {
   const { email } = route.params || {};
+  const { signOut } = useAuth();
   const [isResending, setIsResending] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -30,28 +35,103 @@ const EmailVerificationScreen = ({ navigation, route }) => {
   }, []);
 
   const handleResendEmail = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Email address not found. Please try registering again.');
+      return;
+    }
+
     setIsResending(true);
     try {
-      // Burada resend verification email logic olacak
-      console.log('Resending verification email to:', email);
-      Alert.alert('Email Sent', 'Verification email has been resent');
-      setCountdown(60);
-      setCanResend(false);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+
+      if (error) {
+        await handleAuthError(error, {
+          context: 'resend_verification',
+          email,
+          action: 'resendVerification'
+        });
+        Alert.alert('Error', 'Failed to resend verification email. Please try again.');
+      } else {
+        Alert.alert('Email Sent', 'Verification email has been resent. Please check your inbox.');
+        setCountdown(60);
+        setCanResend(false);
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to send email');
+      await handleAuthError(error, {
+        context: 'resend_verification_catch',
+        email,
+        action: 'resendVerification'
+      });
+      Alert.alert('Error', 'Failed to send email. Please try again.');
     } finally {
       setIsResending(false);
     }
   };
 
-  const handleVerificationComplete = () => {
+  const checkVerificationStatus = async () => {
+    setIsCheckingVerification(true);
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        await handleAuthError(error, {
+          context: 'check_verification',
+          email,
+          action: 'checkVerificationStatus'
+        });
+        Alert.alert('Error', 'Unable to check verification status. Please try again.');
+        return;
+      }
+
+      // If there's a session and the user is verified, navigate to main app
+      if (session?.user?.email_confirmed_at) {
+        Alert.alert(
+          'Verification Complete!', 
+          'Your email address has been successfully verified. You can now access your account.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => navigation.navigate('Login')
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Email Not Verified',
+          'Your email address has not been verified yet. Please check your inbox and click the verification link.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Resend Email', 
+              onPress: () => canResend && handleResendEmail() 
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      await handleAuthError(error, {
+        context: 'check_verification_catch',
+        email,
+        action: 'checkVerificationStatus'
+      });
+      Alert.alert('Error', 'Unable to check verification status. Please try again.');
+    } finally {
+      setIsCheckingVerification(false);
+    }
+  };
+
+  const handleDifferentEmail = () => {
     Alert.alert(
-      'Verification Complete', 
-      'Your email address has been successfully verified!',
+      'Use Different Email',
+      'Would you like to register with a different email address?',
       [
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Sign In',
-          onPress: () => navigation.navigate('Login')
+          text: 'Yes, Register Again',
+          onPress: () => navigation.navigate('Register')
         }
       ]
     );
@@ -109,13 +189,24 @@ const EmailVerificationScreen = ({ navigation, route }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Demo Button - Gerçek uygulamada bu olmayacak */}
+        {/* Check Verification Button */}
         <TouchableOpacity
-          style={styles.demoButton}
-          onPress={handleVerificationComplete}
+          style={[styles.checkButton, isCheckingVerification && styles.checkButtonDisabled]}
+          onPress={checkVerificationStatus}
+          disabled={isCheckingVerification}
         >
-          <Text style={styles.demoButtonText}>
-            Demo: Complete Verification
+          <Text style={styles.checkButtonText}>
+            {isCheckingVerification ? 'Checking...' : 'I\'ve Verified My Email'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Different Email Button */}
+        <TouchableOpacity
+          style={styles.differentEmailButton}
+          onPress={handleDifferentEmail}
+        >
+          <Text style={styles.differentEmailButtonText}>
+            Use Different Email
           </Text>
         </TouchableOpacity>
 
@@ -201,17 +292,34 @@ const styles = StyleSheet.create({
   resendButtonTextDisabled: {
     color: '#999',
   },
-  demoButton: {
+  checkButton: {
     backgroundColor: '#22c55e',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    marginBottom: 16,
+  },
+  checkButtonDisabled: {
+    backgroundColor: '#e5e5e5',
+  },
+  checkButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  differentEmailButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#f97316',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 24,
     marginBottom: 24,
   },
-  demoButtonText: {
+  differentEmailButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: '#f97316',
   },
   backContainer: {
     alignItems: 'center',

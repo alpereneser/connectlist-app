@@ -35,6 +35,7 @@ import Header from '../components/Header';
 import BottomMenu from '../components/BottomMenu';
 import AvatarUpload, { AvatarImage } from '../components/AvatarUpload';
 import { useAuth } from '../contexts/AuthContext';
+import tokens from '../utils/designTokens';
 
 const ProfileScreen = ({ route, navigation }) => {
   const { userId } = route.params || {};
@@ -568,7 +569,7 @@ const ProfileScreen = ({ route, navigation }) => {
 
             {isOwnProfile && (
               <TouchableOpacity style={styles.editIconButton} onPress={handleEditProfile}>
-                <PencilSimple size={20} color="#666" />
+                <PencilSimple size={20} color={tokens.colors.gray[500]} />
               </TouchableOpacity>
             )}
           </View>
@@ -580,14 +581,14 @@ const ProfileScreen = ({ route, navigation }) => {
                 style={[styles.followButton, isFollowing && styles.followingButton]}
                 onPress={handleFollow}
               >
-                <UserPlus size={16} color={isFollowing ? '#666' : '#fff'} />
+                <UserPlus size={16} color={isFollowing ? tokens.colors.gray[500] : tokens.colors.background.primary} />
                 <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
                   {isFollowing ? 'Following' : 'Follow'}
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-                <ChatCircle size={16} color="#1a1a1a" />
+                <ChatCircle size={16} color={tokens.colors.gray[900]} />
                 <Text style={styles.messageButtonText}>Message</Text>
               </TouchableOpacity>
             </View>
@@ -613,7 +614,7 @@ const ProfileScreen = ({ route, navigation }) => {
                 >
                   <Icon 
                     size={16} 
-                    color={isSelected ? '#f97316' : '#666'} 
+                    color={isSelected ? tokens.colors.primary : tokens.colors.gray[500]} 
                     weight={isSelected ? 'fill' : 'regular'}
                   />
                   <Text style={[styles.categoryText, isSelected && styles.selectedCategoryText]}>
@@ -678,7 +679,7 @@ const ProfileScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.background.primary,
   },
   content: {
     flex: 1,
@@ -689,28 +690,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[500],
   },
   profileHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    padding: tokens.spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: tokens.colors.gray[100],
   },
   profileMainSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: tokens.spacing.lg,
   },
   profileImageContainer: {
-    marginRight: 16,
+    marginRight: tokens.spacing.lg,
   },
   profileImage: {
     width: 80,
     height: 80,
     borderRadius: 40,
     borderWidth: 2,
-    borderColor: '#f97316',
+    borderColor: tokens.colors.primary,
   },
   profileInfo: {
     flex: 1,
@@ -723,27 +724,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   profileName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginRight: 8,
+    fontSize: tokens.typography.fontSize.xl,
+    fontWeight: tokens.typography.fontWeight.bold,
+    color: tokens.colors.gray[900],
+    marginRight: tokens.spacing.sm,
   },
   editIconButton: {
-    padding: 8,
+    padding: tokens.spacing.sm,
     alignSelf: 'flex-start',
+    minHeight: tokens.touchTarget.minimum,
+    minWidth: tokens.touchTarget.minimum,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   username: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    fontSize: tokens.typography.fontSize.lg,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.gray[900],
+    marginBottom: tokens.spacing.md,
   },
   bio: {
-    fontSize: 17,
-    color: '#1a1a1a',
+    fontSize: tokens.typography.fontSize.md,
+    color: tokens.colors.gray[900],
     textAlign: 'left',
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: tokens.typography.fontSize.md * tokens.typography.lineHeight.normal,
+    marginBottom: tokens.spacing.lg,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -751,125 +756,134 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: tokens.spacing.lg,
+    minHeight: tokens.touchTarget.minimum,
+    justifyContent: 'center',
   },
   statNumber: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    fontSize: tokens.typography.fontSize.lg,
+    fontWeight: tokens.typography.fontWeight.bold,
+    color: tokens.colors.gray[900],
+    marginBottom: tokens.spacing.xs / 2,
   },
   statLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.gray[500],
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    gap: 12,
+    gap: tokens.spacing.md,
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    backgroundColor: tokens.colors.gray[50],
+    paddingHorizontal: tokens.spacing.xl,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.borderRadius.medium,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.colors.gray[300],
+    minHeight: tokens.touchTarget.comfortable,
   },
   editButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginLeft: 6,
+    fontSize: tokens.typography.fontSize.md,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.gray[900],
+    marginLeft: tokens.spacing.sm,
   },
   followButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f97316',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: tokens.colors.primary,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.borderRadius.medium,
+    minHeight: tokens.touchTarget.comfortable,
   },
   followingButton: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    backgroundColor: tokens.colors.gray[50],
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.colors.gray[300],
   },
   followButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 6,
+    fontSize: tokens.typography.fontSize.md,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.background.primary,
+    marginLeft: tokens.spacing.sm,
   },
   followingButtonText: {
-    color: '#666',
+    color: tokens.colors.gray[500],
   },
   messageButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    backgroundColor: tokens.colors.gray[50],
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.borderRadius.medium,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.colors.gray[300],
+    minHeight: tokens.touchTarget.comfortable,
   },
   messageButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginLeft: 6,
+    fontSize: tokens.typography.fontSize.md,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    color: tokens.colors.gray[900],
+    marginLeft: tokens.spacing.sm,
   },
   categoryFilter: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingLeft: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
+    paddingVertical: tokens.spacing.md,
+    paddingLeft: tokens.spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: tokens.colors.gray[50],
   },
   categoryScrollContent: {
-    paddingRight: 16,
+    paddingRight: tokens.spacing.lg,
   },
   categoryItem: {
     flexDirection: 'column',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    marginRight: tokens.spacing.sm,
     backgroundColor: 'transparent',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
-    minHeight: 60,
+    minHeight: tokens.touchTarget.large,
     justifyContent: 'center',
   },
   selectedCategoryItem: {
-    borderBottomColor: '#f97316',
+    borderBottomColor: tokens.colors.primary,
   },
   categoryText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-    fontWeight: '500',
+    fontSize: tokens.typography.fontSize.sm,
+    color: tokens.colors.gray[500],
+    marginTop: tokens.spacing.xs,
+    fontWeight: tokens.typography.fontWeight.medium,
     textAlign: 'center',
   },
   selectedCategoryText: {
-    color: '#f97316',
-    fontWeight: '600',
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.fontWeight.semibold,
   },
   viewModeToggle: {
     flexDirection: 'row',
     paddingRight: 16,
   },
   viewModeButton: {
-    padding: 8,
-    marginLeft: 8,
-    borderRadius: 6,
+    padding: tokens.spacing.sm,
+    marginLeft: tokens.spacing.sm,
+    borderRadius: tokens.borderRadius.small,
+    minHeight: tokens.touchTarget.minimum,
+    minWidth: tokens.touchTarget.minimum,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   activeViewModeButton: {
-    backgroundColor: '#fff5f0',
+    backgroundColor: tokens.colors.primaryLight,
   },
   listsContainer: {
     flex: 1,
