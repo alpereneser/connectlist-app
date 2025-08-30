@@ -16,7 +16,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.connectlist.me",
+      "bundleIdentifier": "me.connectlist.app",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleDefault",
         "UIViewControllerBasedStatusBarAppearance": false
