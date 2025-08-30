@@ -34,9 +34,14 @@
         "autoIncrement": true,
         "buildType": "aab"
       },
+      "prebuildCommand": "prebuild --clean",
+      "cache": {
+        "key": "sentry-clean-1"
+      },
       "env": {
         "NODE_ENV": "production",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EAS_BUILD_DISABLE_COCOAPODS_CACHE": "1"
       }
     }
   },
