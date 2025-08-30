@@ -1,7 +1,8 @@
-import * as Sentry from '@sentry/react-native';
+// Sentry disabled in this build to avoid native iOS compilation issues
+const Sentry = null;
 import { Platform } from 'react-native';
 
-// Sentry configuration
+// Sentry configuration (kept for compatibility but not used)
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const ENVIRONMENT = process.env.EXPO_PUBLIC_ENVIRONMENT || 'development';
 const DEBUG_MODE = process.env.EXPO_PUBLIC_DEBUG_MODE === 'true';
@@ -14,43 +15,18 @@ class ErrorService {
 
   init() {
     try {
-      // Only initialize Sentry in production or if DSN is provided
-      if (SENTRY_DSN && (ENVIRONMENT === 'production' || DEBUG_MODE)) {
-        Sentry.init({
-          dsn: SENTRY_DSN,
-          environment: ENVIRONMENT,
-          debug: __DEV__ && DEBUG_MODE,
-          enableAutoSessionTracking: true,
-          sessionTrackingIntervalMillis: 30000,
-          enableOutOfMemoryTracking: false, // Disable for React Native
-          beforeSend: event => {
-            // Filter out development errors in production
-            if (
-              ENVIRONMENT === 'production' &&
-              event.environment === 'development'
-            ) {
-              return null;
-            }
-            return event;
-          },
-        });
-
-        this.isInitialized = true;
-        console.log('Sentry initialized successfully');
-      } else {
-        console.log(
-          'Sentry not initialized - missing DSN or not in production',
-        );
-      }
+      // Explicitly disable Sentry to prevent native integration
+      this.isInitialized = false;
+      console.log('Sentry is disabled for this build (native integration removed).');
     } catch (error) {
-      console.error('Failed to initialize Sentry:', error);
+      console.error('Failed to initialize error service:', error);
     }
   }
 
   // Capture exceptions
   captureException(error, context = {}) {
     try {
-      if (this.isInitialized) {
+      if (this.isInitialized && Sentry) {
         Sentry.captureException(error, {
           extra: context,
           tags: {
@@ -72,7 +48,7 @@ class ErrorService {
   // Capture messages
   captureMessage(message, level = 'info', context = {}) {
     try {
-      if (this.isInitialized) {
+      if (this.isInitialized && Sentry) {
         Sentry.captureMessage(message, level, {
           extra: context,
           tags: {
@@ -94,7 +70,7 @@ class ErrorService {
   // Set user context
   setUser(user) {
     try {
-      if (this.isInitialized) {
+      if (this.isInitialized && Sentry) {
         Sentry.setUser({
           id: user.id,
           email: user.email,
@@ -109,7 +85,7 @@ class ErrorService {
   // Set custom context
   setContext(key, context) {
     try {
-      if (this.isInitialized) {
+      if (this.isInitialized && Sentry) {
         Sentry.setContext(key, context);
       }
     } catch (error) {
@@ -120,7 +96,7 @@ class ErrorService {
   // Add breadcrumb
   addBreadcrumb(message, category = 'custom', level = 'info', data = {}) {
     try {
-      if (this.isInitialized) {
+      if (this.isInitialized && Sentry) {
         Sentry.addBreadcrumb({
           message,
           category,
