@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "ConnectList",
+    "slug": "connectlist-minimal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.connectlist.minimal",
+      "infoPlist": {
+        "UIStatusBarStyle": "UIStatusBarStyleDefault",
+        "UIViewControllerBasedStatusBarAppearance": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.connectlist.minimal",
+      "permissions": [
+        "android.permission.INTERNET"
+      ],
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "description": "Sevdiğiniz film, kitap, müzik ve oyunları listeleyin, arkadaşlarınızla paylaşın!",
+    "keywords": [
+      "liste",
+      "film",
+      "kitap",
+      "müzik",
+      "sosyal",
+      "paylaşım"
+    ],
+    "privacy": "public",
+    "category": "social"
+  }
+}

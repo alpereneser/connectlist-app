@@ -1,0 +1,31 @@
+{
+  "app_name": "ConnectList",
+  "subtitle": "Sosyal Liste Uygulaması",
+  "category": "Social Networking",
+  "secondary_category": "Entertainment",
+  "age_rating": "4+",
+  "content_rights": "© 2024 ConnectList. Tüm hakları saklıdır.",
+  "privacy_policy_url": "https://connectlist.app/privacy",
+  "support_url": "https://connectlist.app/support",
+  "marketing_url": "https://connectlist.app",
+  "promotional_text": "Sevdiğiniz içerikleri listeleyin, arkadaşlarınızla paylaşın ve yeni keşifler yapın!",
+  "review_notes": "ConnectList, kullanıcıların film, kitap, müzik ve diğer içerikleri listeleyip paylaşabildiği sosyal bir platformdur. Uygulama tamamen ücretsizdir ve kullanıcı gizliliğini ön planda tutar.",
+  "app_review_information": {
+    "contact_email": "review@connectlist.app",
+    "contact_phone": "+90 XXX XXX XX XX",
+    "demo_account": {
+      "username": "demo@connectlist.app",
+      "password": "Demo123!"
+    },
+    "notes": "Demo hesabı ile tüm özellikler test edilebilir. Uygulama gerçek kullanıcı verileri ile çalışmaktadır."
+  },
+  "version_info": {
+    "version": "1.0.0",
+    "release_notes": "İlk sürüm! ConnectList ile sevdiğiniz içerikleri listeleyin ve arkadaşlarınızla paylaşın.",
+    "copyright": "ConnectList"
+  },
+  "localization": {
+    "primary_language": "tr",
+    "supported_languages": ["tr", "en"]
+  }
+}

@@ -1,0 +1,356 @@
+-- WARNING This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.admin_users (
+  email text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT admin_users_pkey PRIMARY KEY (email)
+);
+CREATE TABLE public.app_secrets (
+  id integer NOT NULL DEFAULT nextval('app_secrets_id_seq'regclass),
+  name text NOT NULL UNIQUE,
+  value text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT app_secrets_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.audit_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  action text NOT NULL,
+  table_name text NOT NULL,
+  record_id text NOT NULL,
+  old_data jsonb,
+  new_data jsonb,
+  ip_address text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.auth_attempts (
+  ip_address text NOT NULL,
+  attempt_count integer DEFAULT 1,
+  last_attempt timestamp with time zone DEFAULT now(),
+  CONSTRAINT auth_attempts_pkey PRIMARY KEY (ip_address)
+);
+CREATE TABLE public.blog_posts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  content text NOT NULL,
+  slug text NOT NULL UNIQUE,
+  published boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT blog_posts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.book_details (
+  id text NOT NULL,
+  title text NOT NULL,
+  authors ARRAY,
+  publisher text,
+  published_date text,
+  description text,
+  page_count integer,
+  categories ARRAY,
+  image_links jsonb,
+  language text,
+  preview_link text,
+  info_link text,
+  created_at timestamp with time zone DEFAULT now(),
+  published_year integer DEFAULT extract_year(published_date),
+  published_month integer DEFAULT extract_month(published_date),
+  published_day integer DEFAULT extract_day(published_date),
+  CONSTRAINT book_details_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.comments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  list_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  parent_comment_id uuid,
+  content text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT comments_pkey PRIMARY KEY (id),
+  CONSTRAINT comments_list_id_fkey FOREIGN KEY (list_id) REFERENCES public.lists(id),
+  CONSTRAINT comments_parent_comment_id_fkey FOREIGN KEY (parent_comment_id) REFERENCES public.comments(id),
+  CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.content_lists (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  list_id uuid,
+  content_type text NOT NULL CHECK (content_type = ANY (ARRAY['movie'text, 'series'text, 'book'text, 'game'text, 'person'text])),
+  content_id text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT content_lists_pkey PRIMARY KEY (id),
+  CONSTRAINT content_lists_list_id_fkey FOREIGN KEY (list_id) REFERENCES public.lists(id)
+);
+CREATE TABLE public.conversation_participants (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  conversation_id uuid,
+  user_id uuid,
+  CONSTRAINT conversation_participants_pkey PRIMARY KEY (id),
+  CONSTRAINT conversation_participants_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id),
+  CONSTRAINT conversation_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.conversations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  last_message_at timestamp with time zone,
+  last_message_text text,
+  CONSTRAINT conversations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.follows (
+  follower_id uuid NOT NULL,
+  following_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT follows_pkey PRIMARY KEY (follower_id, following_id),
+  CONSTRAINT follows_follower_id_fkey FOREIGN KEY (follower_id) REFERENCES public.profiles(id),
+  CONSTRAINT follows_following_id_fkey FOREIGN KEY (following_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.game_details (
+  id text NOT NULL,
+  name text NOT NULL,
+  description text,
+  released text,
+  background_image text,
+  metacritic integer,
+  rating numeric,
+  ratings_count integer,
+  platforms jsonb,
+  genres jsonb,
+  developers jsonb,
+  publishers jsonb,
+  esrb_rating text,
+  created_at timestamp with time zone DEFAULT now(),
+  released_year integer DEFAULT extract_year(released),
+  released_month integer DEFAULT extract_month(released),
+  released_day integer DEFAULT extract_day(released),
+  CONSTRAINT game_details_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.list_comments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  list_id uuid,
+  user_id uuid,
+  parent_id uuid,
+  text text NOT NULL CHECK (length(text) = 1 AND length(text) = 1000),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT list_comments_pkey PRIMARY KEY (id),
+  CONSTRAINT list_comments_list_id_fkey FOREIGN KEY (list_id) REFERENCES public.lists(id),
+  CONSTRAINT list_comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT list_comments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.list_comments(id)
+);
+CREATE TABLE public.list_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  list_id uuid NOT NULL,
+  external_id text NOT NULL,
+  title text NOT NULL,
+  image_url text,
+  type text NOT NULL CHECK (type = ANY (ARRAY['movie'text, 'series'text, 'book'text, 'game'text, 'person'text, 'video'text, 'place'text])),
+  year text,
+  description text,
+  position integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT list_items_pkey PRIMARY KEY (id),
+  CONSTRAINT list_items_list_id_fkey FOREIGN KEY (list_id) REFERENCES public.lists(id)
+);
+CREATE TABLE public.list_likes (
+  list_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT list_likes_pkey PRIMARY KEY (list_id, user_id),
+  CONSTRAINT list_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT list_likes_list_id_fkey FOREIGN KEY (list_id) REFERENCES public.lists(id)
+);
+CREATE TABLE public.lists (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  title text NOT NULL CHECK (length(title) = 3 AND length(title) = 100),
+  description text,
+  category text NOT NULL CHECK (category = ANY (ARRAY['movies'text, 'series'text, 'books'text, 'games'text, 'people'text, 'videos'text, 'places'text])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_public boolean DEFAULT true,
+  likes_count integer DEFAULT 0,
+  items_count integer DEFAULT 0,
+  CONSTRAINT lists_pkey PRIMARY KEY (id),
+  CONSTRAINT lists_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.messages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  conversation_id uuid,
+  sender_id uuid,
+  text text,
+  created_at timestamp with time zone DEFAULT now(),
+  is_read boolean DEFAULT false,
+  encrypted_text text,
+  encryption_key_id uuid,
+  CONSTRAINT messages_pkey PRIMARY KEY (id),
+  CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id),
+  CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id)
+);
+CREATE TABLE public.movie_details (
+  id text NOT NULL,
+  title text NOT NULL,
+  overview text,
+  poster_path text,
+  backdrop_path text,
+  release_date text,
+  runtime integer,
+  vote_average numeric,
+  vote_count integer,
+  genres jsonb,
+  cast_members jsonb,
+  crew_members jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT movie_details_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  type text NOT NULL CHECK (type = ANY (ARRAY['like'text, 'comment'text, 'follow'text, 'message'text])),
+  data jsonb NOT NULL,
+  is_read boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.person_details (
+  id text NOT NULL,
+  name text NOT NULL,
+  biography text,
+  birthday text,
+  deathday text,
+  place_of_birth text,
+  profile_path text,
+  known_for_department text,
+  also_known_as ARRAY,
+  movie_credits jsonb,
+  tv_credits jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT person_details_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.place_list_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  list_id uuid NOT NULL,
+  place_id uuid NOT NULL,
+  note text,
+  order_index integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT place_list_items_pkey PRIMARY KEY (id),
+  CONSTRAINT place_list_items_place_id_fkey FOREIGN KEY (place_id) REFERENCES public.places(id),
+  CONSTRAINT place_list_items_list_id_fkey FOREIGN KEY (list_id) REFERENCES public.lists(id)
+);
+CREATE TABLE public.places (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  google_place_id text NOT NULL UNIQUE,
+  name text NOT NULL,
+  address text NOT NULL,
+  phone text,
+  website text,
+  location USER-DEFINED,
+  rating numeric,
+  user_ratings_total integer,
+  types ARRAY,
+  photos jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT places_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  username text NOT NULL CHECK (username ~ '^[a-zA-Z0-9_]{3,30}$'text),
+  full_name text NOT NULL,
+  referral_code text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  avatar text NOT NULL DEFAULT 'httpsapi.dicebear.com7.xavataaarssvg'text,
+  bio text,
+  website text,
+  location text,
+  followers_count integer DEFAULT 0,
+  following_count integer DEFAULT 0,
+  avatar_url text,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.push_subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  endpoint text NOT NULL,
+  auth text NOT NULL,
+  p256dh text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT push_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.referral_codes (
+  code text NOT NULL,
+  is_used boolean DEFAULT false,
+  used_by uuid,
+  used_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT referral_codes_pkey PRIMARY KEY (code),
+  CONSTRAINT referral_codes_used_by_fkey FOREIGN KEY (used_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.roadmap_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  status text NOT NULL DEFAULT 'planned'text CHECK (status = ANY (ARRAY['planned'text, 'in_progress'text, 'completed'text, 'delayed'text])),
+  target_date date,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT roadmap_items_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.series_details (
+  id text NOT NULL,
+  title text NOT NULL,
+  overview text,
+  poster_path text,
+  backdrop_path text,
+  first_air_date text,
+  last_air_date text,
+  number_of_seasons integer,
+  number_of_episodes integer,
+  vote_average numeric,
+  vote_count integer,
+  genres jsonb,
+  cast_members jsonb,
+  crew_members jsonb,
+  seasons jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT series_details_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.spatial_ref_sys (
+  srid integer NOT NULL CHECK (srid  0 AND srid = 998999),
+  auth_name character varying,
+  auth_srid integer,
+  srtext character varying,
+  proj4text character varying,
+  CONSTRAINT spatial_ref_sys_pkey PRIMARY KEY (srid)
+);
+CREATE TABLE public.user_email_preferences (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid UNIQUE,
+  new_follower boolean DEFAULT true,
+  list_item_added boolean DEFAULT true,
+  new_comment boolean DEFAULT true,
+  comment_reply boolean DEFAULT true,
+  new_message boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_email_preferences_pkey PRIMARY KEY (id),
+  CONSTRAINT user_email_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.user_settings (
+  user_id uuid NOT NULL,
+  dark_mode boolean DEFAULT false,
+  notifications boolean DEFAULT true,
+  language text DEFAULT 'English'text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_settings_pkey PRIMARY KEY (user_id),
+  CONSTRAINT user_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);

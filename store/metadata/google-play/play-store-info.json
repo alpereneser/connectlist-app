@@ -1,0 +1,59 @@
+{
+  "app_name": "ConnectList",
+  "package_name": "com.connectlist.minimal",
+  "category": "SOCIAL",
+  "content_rating": "Everyone",
+  "target_audience": {
+    "age_groups": ["13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"],
+    "interests": ["Movies", "Books", "Music", "Games", "Social Media"]
+  },
+  "app_details": {
+    "website": "https://connectlist.app",
+    "email": "support@connectlist.app",
+    "phone": "+90 XXX XXX XX XX",
+    "privacy_policy": "https://connectlist.app/privacy",
+    "terms_of_service": "https://connectlist.app/terms"
+  },
+  "store_listing": {
+    "promotional_text": "Sevdiğiniz içerikleri listeleyin, arkadaşlarınızla paylaşın ve yeni keşifler yapın!",
+    "feature_graphic_required": true,
+    "screenshots_required": {
+      "phone": "2-8 screenshots",
+      "7_inch_tablet": "1-8 screenshots (optional)",
+      "10_inch_tablet": "1-8 screenshots (optional)"
+    }
+  },
+  "content_guidelines": {
+    "user_generated_content": true,
+    "social_features": true,
+    "data_collection": {
+      "personal_info": ["Name", "Email"],
+      "usage_data": ["App interactions", "Preferences"],
+      "device_data": ["Device ID", "Operating system"]
+    },
+    "data_sharing": "No data shared with third parties",
+    "data_security": "Data encrypted in transit and at rest"
+  },
+  "version_info": {
+    "version_name": "1.0.0",
+    "version_code": 1,
+    "release_notes": "🎉 ConnectList'e hoş geldiniz!\n\n✨ İlk sürümde neler var:\n• Film, kitap, müzik ve oyun listeleri oluşturun\n• Arkadaşlarınızı takip edin ve listelerini keşfedin\n• Yorumlar ve beğenilerle etkileşim kurun\n• Güvenli ve hızlı kullanıcı deneyimi\n\nSevdiğiniz içerikleri organize etmenin en kolay yolu!",
+    "recent_changes": "İlk sürüm - ConnectList ile tanışın!"
+  },
+  "localization": {
+    "default_language": "tr-TR",
+    "supported_languages": ["tr-TR", "en-US"]
+  },
+  "testing": {
+    "internal_testing": {
+      "enabled": true,
+      "testers": "development team"
+    },
+    "closed_testing": {
+      "enabled": false
+    },
+    "open_testing": {
+      "enabled": false
+    }
+  }
+}

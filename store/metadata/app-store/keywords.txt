@@ -1,0 +1,1 @@
+liste,film,kitap,müzik,oyun,sosyal,paylaşım,öneri,keşfet,arkadaş,takip,beğeni,yorum,profil
