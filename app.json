@@ -16,7 +16,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.connectlist.minimal",
+      "bundleIdentifier": "me.connectlist.app",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleDefault",
         "UIViewControllerBasedStatusBarAppearance": false
@@ -30,7 +30,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.connectlist.minimal",
+      "package": "me.connectlist.app",
       "permissions": [
         "android.permission.INTERNET"
       ],

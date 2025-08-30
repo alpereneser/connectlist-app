@@ -26,7 +26,8 @@
     "production": {
       "ios": {
         "resourceClass": "m-medium",
-        "autoIncrement": true
+        "autoIncrement": true,
+        "credentialsSource": "remote"
       },
       "android": {
         "autoIncrement": true,
