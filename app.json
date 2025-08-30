@@ -42,14 +42,7 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font",
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "connectlist",
-          "project": "connectlist-app"
-        }
-      ]
+      "expo-font"
     ],
     "description": "Sevdiğiniz film, kitap, müzik ve oyunları listeleyin, arkadaşlarınızla paylaşın!",
     "keywords": [
