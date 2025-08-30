@@ -27,14 +27,16 @@
       "ios": {
         "resourceClass": "m-medium",
         "autoIncrement": true,
-        "credentialsSource": "remote"
+        "credentialsSource": "remote",
+        "buildConfiguration": "Release"
       },
       "android": {
         "autoIncrement": true,
         "buildType": "aab"
       },
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
   },

@@ -23,7 +23,8 @@
       },
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "jsEngine": "hermes"
     },
     "android": {
       "adaptiveIcon": {
@@ -41,7 +42,14 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "connectlist",
+          "project": "connectlist-app"
+        }
+      ]
     ],
     "description": "Sevdiğiniz film, kitap, müzik ve oyunları listeleyin, arkadaşlarınızla paylaşın!",
     "keywords": [
